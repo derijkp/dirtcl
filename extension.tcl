@@ -55,6 +55,26 @@ if 0 {
 
 }
 
+proc ext::updatecatalog_dir {pathdir {pre {}}} {
+	variable catalog
+	variable catalog_time
+	upvar done done
+	set list [glob -nocomplain $pathdir/*]
+	foreach file $list {
+		set tail [file tail $file]
+		if {[regexp {^(.*?)-?([0-9.]+)$} $tail temp name version]} {
+		} elseif {[regexp {^(.*?)-?([0-9.]+[A-Za-z0-9]+)$} $tail temp name version]} {
+		} else {
+			ext::updatecatalog_dir $file ${tail}::
+			continue
+		}
+		if {[info exists done($pre$name-$version)]} continue
+		lappend catalog($pre$name) [list $version $file]
+		set done($pre$name-$version) 1
+	}
+	set catalog_time($pathdir) [file mtime $pathdir]
+}
+
 proc ext::updatecatalog {} {
 	global ext_path
 	variable catalog
@@ -73,17 +93,7 @@ proc ext::updatecatalog {} {
 	if {![info exists update]} return
 	unset -nocomplain catalog
 	foreach pathdir $ext_path {
-		set list [glob -nocomplain $pathdir/*]
-		foreach file $list {
-			set tail [file tail $file]
-			if {[regexp {^(.*?)-?([0-9.]+)$} $tail temp name version]} {
-			} elseif {[regexp {^(.*?)-?([0-9.]+[A-Za-z0-9]+)$} $tail temp name version]} {
-			}
-			if {[info exists done($name-$version)]} continue
-			lappend catalog($name) [list $version $file]
-			set done($name-$version) 1
-		}
-		set catalog_time($pathdir) [file mtime $pathdir]
+		ext::updatecatalog_dir $pathdir
 	}
 	foreach name [array names catalog] {
 		set catalog($name) [lsort -index 0 -command ext::version_compare -decreasing $catalog($name)]
@@ -130,15 +140,18 @@ proc extension {cmd args} {
 		if {[info exists ext::loaded($name-$fversion)]} {
 			return $ext::loaded($name-$fversion)
 		} else {
+			set f [open $dir/init.tcl]
+			set c [read $f]
+			close $f
 			if {[info exists ::dir]} {
 				set keepdir $::dir
 				set ::dir $dir
-				set error [catch {uplevel #0 source $dir/init.tcl} errormsg]
+				set error [catch {uplevel #0 $c} errormsg]
 				set ::dir $keepdir
 				if {$error} {error $errormsg}
 			} else {
 				set ::dir $dir
-				uplevel #0 source $dir/init.tcl
+				uplevel #0 $c
 				unset ::dir
 			}
 			return $fversion

@@ -62,3 +62,42 @@ foreach file {
 cd [glob [file dir [file dir $dir]]/obsolete/textutil*]
 file copy adjust.tcl split.tcl tabify.tcl trim.tcl [glob $dir/textutil-*]
 eval file copy [glob *.tex] {[glob $dir/textutil-*]}
+
+
+set files [glob *::*]
+foreach file $files {
+	set list [string_split $file ::]
+	set len [llength $list]
+	incr len -1
+	for {set i 0} {$i < $len} {incr i} {
+		set dir [join [lrange $list 0 $i] /]
+		puts $dir
+		file mkdir $dir
+	}
+	file rename $file $dir/[lindex $list end]
+}
+
+set files [glob */init.tcl */*/init.tcl]
+foreach file $files {
+	set dir [file dir $file]
+	set tail [file tail $file]
+	if {[catch {
+		set dest [glob ~/build/dirtcl8.4.9-Linux-i686/exts/$dir*/init.tcl]
+	}]} {
+		puts "cp -f $file "
+	} else {
+		puts "cp -f $file $dest"
+	}
+}
+
+set dest /home/peter/peter-vm/build/dirtcl8.4.9-Windows-i686/exts
+cp -f Extral/init.tcl $dest/Extral2.0.3/init.tcl
+cp -f tclCompress/init.tcl $dest/Compress0.1.0
+cp -f interface/init.tcl $dest/interface0.8.9/init.tcl
+cp -f dbi/init.tcl $dest/dbi0.8.9/init.tcl
+cp -f ClassyTk/init.tcl $dest/ClassyTk1.0.0/init.tcl
+cp -f ClassyTcl/init.tcl $dest/Class1.0.0
+cp -f abi_tools/init.tcl $dest/abi0.1.3
+cp -f dbi/sqlite3/init.tcl $dest/dbi_sqlite3-0.8.9
+cp -f dbi/sqlite/init.tcl $dest/dbi_sqlite0.8.9
+cp -f abi_tools/io_lib/init.tcl $dest/io_lib0.1.3
