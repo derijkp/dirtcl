@@ -2,7 +2,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.4.8
+set tclversion 8.4.9
 
 set platform $tcl_platform(platform)
 if {$platform eq "unix"} {
@@ -80,7 +80,6 @@ proc outexec {args} {
 }
 
 set preinitcode {
-void TclSetStartupScriptPath(Tcl_Obj *pathPtr);
 static char preInitCmd[] = 
 "proc file_resolve file {\n"
 "	if {$::tcl_platform(platform) eq \"unix\"} {\n"
@@ -113,13 +112,21 @@ if {![file exists $file.orig]} {
 }
 set c [file_read $file.orig]
 set c [rewrite_before "int\nTcl_AppInit(interp)" $c $preinitcode]
+
 set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c {
+    Tcl_Obj *temp;
     TclSetPreInitScript(preInitCmd);
     }]
+
 set c [rewrite_before "return TCL_OK" $c {
     if (Tcl_Eval(interp, initScript) == TCL_ERROR) {
         return (TCL_ERROR);
     };
+    temp = Tcl_GetVar2Ex(interp,"tcl_boot",NULL,TCL_GLOBAL_ONLY);
+    if (temp != NULL) {
+	Tcl_IncrRefCount(temp);
+        TclSetStartupScriptFileName(Tcl_GetStringFromObj(temp,NULL));
+    }
     }]
 file_write $file $c
 
@@ -134,17 +141,23 @@ if {$platform eq "windows"} {
 	set c [file_read $file.orig]
 	set c [rewrite_before "int\nTcl_AppInit(interp)" $c $preinitcode]
 	set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c {
+	    Tcl_Obj *temp;
 	    TclSetPreInitScript(preInitCmd);
 	    }]
 	set c [rewrite_after {Tcl_SetVar(interp, "tcl_rcFileName", "~/wishrc.tcl", TCL_GLOBAL_ONLY);} $c {
-	    if (Tcl_Eval(interp, initScript) == TCL_ERROR) {
-	        return (TCL_ERROR);
-	    };
-	    }]
+	if (Tcl_Eval(interp, initScript) == TCL_ERROR) {
+		return (TCL_ERROR);
+	};
+	temp = Tcl_GetVar2Ex(interp,"tcl_boot",NULL,TCL_GLOBAL_ONLY);
+	if (temp != NULL) {
+		Tcl_IncrRefCount(temp);
+		TclSetStartupScriptFileName(Tcl_GetStringFromObj(temp,NULL));
+	}
+	}]
 	set c [rewrite_after {"set tcl_libPath [list $tcl_library $tcl_root]\n"} $c {
 		"set tk_library [file join $tcl_root tk$tcl_version]\n"
 	}]
-	file_write $file $c	
+	file_write $file $c
 }
 }
 
@@ -234,8 +247,8 @@ if {$platform eq "windows"} {
 	set ext ""
 }
 }
-file mkdir $dirtcldir/pkgs
-file mkdir $dirtcldir/exts
+file mkdir $dirtcldir/dirtcl/pkgs
+file mkdir $dirtcldir/dirtcl/exts
 
 # setup example
 # -------------

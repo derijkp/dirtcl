@@ -21,10 +21,13 @@ if {$app_base eq "tclsh" } {
 	catch {console show}
 } else {
 	set bootscript [file join $tcl_dirtcl apps $app_base$app_version $app_base.tcl]
-	puts "booting from $bootscript"
+
+	if {[info nameofexecutable] ne [file normalize $argv0]} {
+		if {[info exists argv0]} {set argv [linsert $argv 0 $argv0]}
+		set argv0 $bootscript
+	}
 	if { ![file isfile $bootscript] } {
 		error "Application directory not found. This executable will only work correctly when it is located in its application directory. It can be run from another location by using a link to it"
 	}
-	set tcl_interactive 0
-	source $bootscript
+	set tcl_boot $bootscript
 }

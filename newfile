@@ -1,8 +1,0 @@
-foreach n1 {tcl-8.4b1 tcl-8.4.b1 tcl8.4 tcl8.4} {
-	if {[regsub {([0-9]+\.[0-9]+)\.?([A-Za-z]+[0-9]+)$} $n1 "\\1.\n\\2" temp]} {
-	} elseif {[regsub {([^.][0-9]+\.[0-9]+)$} $n1 {\1.0} temp]} {
-	} else {
-		set temp $n1
-	}
-	puts "$n1 -> $temp"
-}
