@@ -7,7 +7,11 @@ if {[info exists tk_library]} {
 set ext_path [list $tcl_dirtcl/exts]
 package unknown ext::unknown
 
-set app_base [string tolower $tcl_executable]
+if {[info exists tcl_lastlink] && ([file dir $tcl_lastlink] eq [file dir $tcl_executable])} {
+	set app_base [string tolower $tcl_lastlink]
+} else {
+	set app_base [string tolower $tcl_executable]
+}
 regexp {^(.+?)([0-9.]*)(\.exe)?$} [file tail $app_base] temp app_base app_version
 if {$app_base eq "tclsh" } {
 	if {[lindex $argv 0] eq "-e"} {
@@ -21,8 +25,7 @@ if {$app_base eq "tclsh" } {
 	catch {console show}
 } else {
 	set bootscript [file join $tcl_dirtcl apps $app_base$app_version $app_base.tcl]
-
-	if {[info nameofexecutable] ne [file normalize $argv0]} {
+	if {[file normalize [info nameofexecutable]] ne [file normalize $argv0]} {
 		if {[info exists argv0]} {set argv [linsert $argv 0 $argv0]}
 		set argv0 $bootscript
 	}
