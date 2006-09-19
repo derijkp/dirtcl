@@ -133,7 +133,7 @@ proc extension {cmd args} {
 			}
 		} else {
 			foreach {fversion dir} [lindex $catalog($name) 0] break
-			if {[ext::version_compare $version $fversion] != -1} {
+			if {[ext::version_compare $version $fversion] == 1} {
 				error "can't find extension $name $version"
 			}
 		}

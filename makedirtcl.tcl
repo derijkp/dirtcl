@@ -2,7 +2,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.4.11
+set tclversion 8.4.13
 
 set platform $tcl_platform(platform)
 set basetcldir [file normalize ../tcl$tclversion]
@@ -238,6 +238,23 @@ set f [open $tcllibdir/tclIndex a]
 puts $f {set auto_index(extension) [list source [file join $dir extension.tcl]]}
 puts $f {set auto_index(ext::unknown) [list source [file join $dir extension.tcl]]}
 close $f
+set c [file_read $tcllibdir/init.tcl]
+set c [string map {{
+if {![info exists auto_path]} {
+    if {[info exists env(TCLLIBPATH)]} {
+	set auto_path $env(TCLLIBPATH)
+    } else {
+	set auto_path ""
+    }
+}
+} {
+if {![info exists auto_path]} {
+	set auto_path ""
+}
+set tcl_pkgPath [file join [file dirname [file dirname [info library]]] pkgs]
+set tclDefaultLibrary [info library]
+}} $c]
+file_write $tcllibdir/init.tcl $c
 }
 
 if {$platform eq "windows"} {
