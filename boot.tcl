@@ -18,6 +18,28 @@ if {$app_base eq "tclsh" } {
 		puts [eval [lindex $argv 1]]
 		exit
 	}
+} elseif {$app_base eq "tca" } {
+	package require Tk
+	if {[file normalize $argv0] eq "[file normalize $tcl_executable]"} {error "no file to run given"}
+	if {![llength $argv]} {
+		if {![file exists $argv0]} {error "file $argv0 does not exist"}
+		set f [open $argv0]
+		set data [read $f]
+		close $f
+		foreach {tca_host tca_cookie srcfile argv} $data break
+		set checkupdate 1
+	} else {
+		foreach {tca_host tca_cookie srcfile argv} $argv break
+		set checkupdate 0
+	}
+	package require tca
+	if {$checkupdate && [tca_updateneeded]} {
+		tca_update tca_update$tcl_platform(execextension)
+		exec [file join $tca_base tca_update$tcl_platform(execextension)] $tca_host $tca_cookie $srcfile $argv &
+		exit
+	}
+	set tcl_boot [file join $tcl_dirtcl $srcfile]
+	set argv0 $tcl_boot
 } elseif {$app_base eq "wish" } {
 	package require Tk
 } elseif {$app_base eq "console" } {
