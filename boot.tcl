@@ -1,12 +1,50 @@
 set tcl_dirtcl [file dir $tcl_root]
-if {$tcl_platform(platform) eq "windows" } {catch {console hide}}
 set auto_path [list $tcl_library $tcl_root $tcl_dirtcl/lib $tcl_dirtcl/pkgs]
+if {$tcl_platform(platform) eq "windows" } {catch {console hide}}
 if {[info exists tk_library]} {
 	lappend auto_path $tk_library
 }
 set ext_path [list $tcl_dirtcl/exts]
+
 package unknown ext::unknown
 
+source $tcl_library/extension.tcl
+if {[ext::version_compare $tcl_version 8.5] >= 0} {
+	# tcl modules, only in 8.5
+	source $tcl_library/tm.tcl
+	proc ::tcl::tm::Defaults {} {
+	    global env tcl_platform
+	
+	    lassign [split [info tclversion] .] major minor
+	    set exe [file normalize [info nameofexecutable]]
+	
+	    # Note that we're using [::list], not [list] because [list] means
+	    # something other than [::list] in this namespace.
+	    roots [::list \
+		    [file dirname [info library]] \
+		    ]
+	
+	    if {$tcl_platform(platform) eq "windows"} {
+		set sep ";"
+	    } else {
+		set sep ":"
+	    }
+	    for {set n $minor} {$n >= 0} {incr n -1} {
+		foreach ev [::list \
+				TCL${major}.${n}_TM_PATH \
+				TCL${major}_${n}_TM_PATH \
+	        ] {
+		    if {![info exists env($ev)]} continue
+		    foreach p [split $env($ev) $sep] {
+			path add $p
+		    }
+		}
+	    }
+	    return
+	}
+	set ::tcl::tm::paths {}
+	::tcl::tm::Defaults
+}
 if {[info exists tcl_lastlink] && ([file dir $tcl_lastlink] eq [file dir $tcl_executable])} {
 	set app_base [string tolower $tcl_lastlink]
 } else {

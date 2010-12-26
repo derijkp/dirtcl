@@ -1,6 +1,6 @@
 namespace eval ext {}
 
-proc ext::unknown {name version {exact {}}} {
+proc ext::unknown {name {version {}} {exact {}}} {
 	if {$exact eq "-exact"} {
 		set error [catch {extension require -exact $name $version} result]
 	} else {
@@ -8,7 +8,11 @@ proc ext::unknown {name version {exact {}}} {
 	}
 	if {$error} {
 		if {[string match "can't find extension*" $result]} {
-			tclPkgUnknown $name $version $exact
+			if {[ext::version_compare $::tcl_version 8.5] >= 0} {
+				::tcl::tm::UnknownHandler ::tclPkgUnknown $name $version $exact
+			} else {
+				tclPkgUnknown $name $version $exact
+			}
 		} else {
 			return -code $error $result
 		}

@@ -2,7 +2,9 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.4.14
+set tclversion 8.5.9
+set threaded 0
+set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
 
 set platform $tcl_platform(platform)
 set basetcldir [file normalize ../tcl$tclversion]
@@ -10,10 +12,13 @@ set basetkdir [file normalize ../tk$tclversion]
 if {$platform eq "unix"} {
 	set tcldir [file normalize ../tcl$tclversion/unix]
 	set tkdir [file normalize ../tk$tclversion/unix]
+	set sh sh
+	set sharedopt --disable-shared
 } elseif {$platform eq "windows"} {
 	set tcldir [file normalize ../tcl$tclversion/win]
 	set tkdir [file normalize ../tk$tclversion/win]
 	set sh C:/msys/1.0/bin/sh.exe
+	set sharedopt --enable-shared
 } else {
 	error "only supported on unix and windows ... yet"
 }
@@ -33,7 +38,7 @@ if {[llength [glob -nocomplain $dirtcldir/*]]} {
 	error "error: current directory (in which dirtcl should be build) is not empty"
 }
 
-set dir [file dir [info script]]
+set dir $scriptdir
 if {$dir ne {}} {cd $dir}
 
 proc file_read {file} {
@@ -112,7 +117,7 @@ if {![file exists $file.orig]} {
 }
 set c [file_read $file.orig]
 set c [rewrite_before "#include \"tcl.h\"" $c "#define DIRTCL 1\n"]
-set c [rewrite_before "int\nTcl_AppInit(interp)" $c $preinitcode]
+set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
 set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c {
 #ifdef DIRTCL
     Tcl_Obj *temp;
@@ -143,7 +148,7 @@ if {![file exists $file.orig]} {
 }
 set c [file_read $file.orig]
 set c [rewrite_before "#include \"tcl.h\"" $c "#define DIRTCL 1\n"]
-set c [rewrite_before "int\nTcl_AppInit(interp)" $c $preinitcode]
+set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
 set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c {
 #ifdef DIRTCL
     Tcl_Obj *temp;
@@ -171,23 +176,33 @@ file_write $file $c
 # compile Tcl
 # -----------------------
 
-puts "compiling tcl"
+puts "compiling tcl ($tcldir)"
 cd $tcldir
-if {$platform eq "unix"} {
-	outexec sh ./configure --disable-shared --disable-threads --disable-symbols -prefix=$dirtcldir
+outexec make distclean
+if {$threaded} {
+	outexec $sh ./configure $sharedopt --enable-threads --disable-symbols -prefix=$dirtcldir
 } else {
-	outexec $sh ./configure --enable-shared --disable-threads --disable-symbols -prefix=$dirtcldir
+	outexec $sh ./configure $sharedopt --disable-symbols -prefix=$dirtcldir
 }
 catch {outexec make} e
+catch {
+	file mkdir lib/tcl$tclshortversion
+	file cp ../library/init.tcl lib/tcl$tclshortversion
+}
 catch {outexec make install} e
 
 # compile Tk
 # ----------------------
-puts "compiling tk"
+puts "compiling tk ($tkdir)"
 cd $tkdir
-outexec sh ./configure --enable-shared --disable-threads --disable-symbols --with-tcl=$tcldir -prefix=$dirtcldir
-catch {outexec make} e
-catch {outexec make install} e
+outexec make distclean
+if {$threaded} {
+	catch {outexec sh ./configure --enable-shared --enable-threads --disable-symbols --with-tcl=$tcldir -prefix=$dirtcldir} e
+} else {
+	catch {outexec sh ./configure --enable-shared --disable-symbols --with-tcl=$tcldir -prefix=$dirtcldir} e
+}
+catch {outexec make}
+catch {outexec make install}
 
 # Convert to dirtcl
 # -----------------
@@ -209,7 +224,7 @@ if {$platform eq "unix"} {
 file delete -force $dirtcldir/man
 # write boot.tcl
 file copy $scriptdir/boot.tcl $dirtcldir/lib/boot.tcl
-set tcllibdir [glob $dirtcldir/lib/tcl[string index $tcl_version 0]*]
+set tcllibdir [lindex [glob $dirtcldir/lib/tcl[string index $tcl_version 0]*] 0]
 file copy $scriptdir/extension.tcl $tcllibdir
 set f [open $tcllibdir/tclIndex a]
 puts $f {set auto_index(extension) [list source [file join $dir extension.tcl]]}
