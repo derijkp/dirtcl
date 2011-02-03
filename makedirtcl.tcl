@@ -6,26 +6,40 @@ set tclversion 8.5.9
 set threaded 0
 set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
 
-set platform $tcl_platform(platform)
+if {[lsearch $argv crosswin] == -1} {
+	set platform crosswin
+} else {
+	set platform $tcl_platform(platform)
+}
 set basetcldir [file normalize ../tcl$tclversion]
 set basetkdir [file normalize ../tk$tclversion]
+# set ext for platform
+# --------------------
 if {$platform eq "unix"} {
 	set tcldir [file normalize ../tcl$tclversion/unix]
 	set tkdir [file normalize ../tk$tclversion/unix]
 	set sh sh
 	set sharedopt --disable-shared
+	set ext ""
 } elseif {$platform eq "windows"} {
 	set tcldir [file normalize ../tcl$tclversion/win]
 	set tkdir [file normalize ../tk$tclversion/win]
 	set sh C:/msys/1.0/bin/sh.exe
 	set sharedopt --enable-shared
+	set ext .exe
+} elseif {$platform eq "crosswin"} {
+	set tcldir [file normalize ../tcl$tclversion/win]
+	set tkdir [file normalize ../tk$tclversion/win]
+	set sh sh
+	set sharedopt --enable-shared
+	set ext .exe
 } else {
 	error "only supported on unix and windows ... yet"
 }
 
 set script [file normalize [info script]]
 # set script /home/peter/dev/dirtcl/makedirtcl.tcl
-if {"$tcl_platform(platform)"=="unix"} {
+if {"$tcl_platform(platform)"=="unix" || "$tcl_platform(platform)"=="crosswin"} {
 	while 1 {
 		if {[catch {set script [file normalize [file readlink $script]]}]} break
 	}
@@ -74,6 +88,7 @@ proc outexec {args} {
 		}
 		close $f
 	} else {
+		puts "----- $args -----"
 		catch {eval exec $args} e
 		puts $e
 	}
@@ -178,31 +193,52 @@ file_write $file $c
 
 puts "compiling tcl ($tcldir)"
 cd $tcldir
-outexec make distclean
-if {$threaded} {
-	outexec $sh ./configure $sharedopt --enable-threads --disable-symbols -prefix=$dirtcldir
-} else {
-	outexec $sh ./configure $sharedopt --disable-symbols -prefix=$dirtcldir
+if {[lsearch $argv noreconfig] == -1} {
+	catch {outexec make distclean}
+	if {$threaded} {
+		set opts {--enable-threads}
+	} else {
+		set opts {--disable-threads}
+	}
+	if {$platform eq "crosswin"} {
+		lappend opts {--host=i686-pc-mingw32}
+	}
+	eval {outexec $sh ./configure} $sharedopt $opts {--disable-symbols -prefix=$dirtcldir}
 }
 catch {outexec make} e
+puts $e
 catch {
 	file mkdir lib/tcl$tclshortversion
-	file cp ../library/init.tcl lib/tcl$tclshortversion
-}
+} e
+puts $e
+catch {
+	file copy ../library/init.tcl lib/tcl$tclshortversion
+} e
+puts $e
 catch {outexec make install} e
+puts $e
 
 # compile Tk
 # ----------------------
 puts "compiling tk ($tkdir)"
 cd $tkdir
-outexec make distclean
-if {$threaded} {
-	catch {outexec sh ./configure --enable-shared --enable-threads --disable-symbols --with-tcl=$tcldir -prefix=$dirtcldir} e
-} else {
-	catch {outexec sh ./configure --enable-shared --disable-symbols --with-tcl=$tcldir -prefix=$dirtcldir} e
+if {[lsearch $argv noreconfig] == -1} {
+	catch {outexec make distclean}
+	if {$threaded} {
+		set opts {--enable-threads}
+	} else {
+		set opts {--disable-threads}
+	}
+	if {$platform eq "crosswin"} {
+		lappend opts {--host=i686-pc-mingw32}
+	}
+	catch {eval {outexec sh ./configure --enable-shared --disable-symbols} $opts {--with-tcl=$tcldir -prefix=$dirtcldir}} e
+	puts $e
 }
-catch {outexec make}
-catch {outexec make install}
+catch {outexec make} e
+puts $e
+catch {outexec make install} e
+puts $e
 
 # Convert to dirtcl
 # -----------------
@@ -224,7 +260,7 @@ if {$platform eq "unix"} {
 file delete -force $dirtcldir/man
 # write boot.tcl
 file copy $scriptdir/boot.tcl $dirtcldir/lib/boot.tcl
-set tcllibdir [lindex [glob $dirtcldir/lib/tcl[string index $tcl_version 0]*] 0]
+set tcllibdir [lindex [glob $dirtcldir/lib/tcl[string index $tcl_version 0].*] 0]
 file copy $scriptdir/extension.tcl $tcllibdir
 set f [open $tcllibdir/tclIndex a]
 puts $f {set auto_index(extension) [list source [file join $dir extension.tcl]]}
@@ -250,15 +286,6 @@ file_write $tcllibdir/init.tcl $c
 file mkdir $dirtcldir/pkgs
 file mkdir $dirtcldir/exts
 file copy [lindex [glob $scriptdir/pkgtools*] 0] $dirtcldir/exts
-
-
-# set ext for platform
-# --------------------
-if {$platform eq "windows"} {
-	set ext .exe
-} else {
-	set ext ""
-}
 
 if {$platform eq "windows"} {
 	file copy -force $tkdir/rc/wish.ico $dirtcldir/lib
