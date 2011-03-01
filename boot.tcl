@@ -79,6 +79,10 @@ if {$app_base eq "tclsh" } {
 		exit
 	}
 	set tcl_boot [file join $tcl_dirtcl $srcfile]
+	if {![info exists $tcl_boot]} {
+		regsub {[0-9.]+$} [lindex [file split $tcl_boot] end-1] {} temp
+		set tcl_boot [lindex [lsort -dict [glob [file join [join [lrange [file split $tcl_boot] 0 end-2] /] $temp* [file tail $tcl_boot]]]] end]
+	}
 	set argv0 $tcl_boot
 } elseif {$app_base eq "wish" } {
 	package require Tk
