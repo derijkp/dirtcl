@@ -6,6 +6,8 @@ if {[info exists tk_library]} {
 }
 set ext_path [list $tcl_dirtcl/exts]
 
+if { [package vsatisfies [package provide Tcl] 8.5] } {package provide dict 8.5.9}
+
 package unknown ext::unknown
 
 source $tcl_library/extension.tcl
