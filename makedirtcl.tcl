@@ -6,11 +6,12 @@ set tclversion 8.5.9
 set threaded 0
 set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
 
-if {[lsearch $argv crosswin] == -1} {
+if {[lsearch $argv crosswin] != -1} {
 	set platform crosswin
 } else {
 	set platform $tcl_platform(platform)
 }
+puts "platform: $platform"
 set basetcldir [file normalize ../tcl$tclversion]
 set basetkdir [file normalize ../tk$tclversion]
 # set ext for platform
@@ -39,7 +40,7 @@ if {$platform eq "unix"} {
 
 set script [file normalize [info script]]
 # set script /home/peter/dev/dirtcl/makedirtcl.tcl
-if {"$tcl_platform(platform)"=="unix" || "$tcl_platform(platform)"=="crosswin"} {
+if {"$tcl_platform(platform)" eq "unix" || "$tcl_platform(platform)" eq "crosswin"} {
 	while 1 {
 		if {[catch {set script [file normalize [file readlink $script]]}]} break
 	}
