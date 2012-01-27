@@ -2,7 +2,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.5.9
+set tclversion 8.5.11
 set threaded 0
 set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
 
