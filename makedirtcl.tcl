@@ -4,6 +4,27 @@ exec tclsh "$0" "$@"
 
 set tclversion 8.5.11
 set threaded 0
+
+set configureopts {}
+while 1 {
+	set v [lindex $argv 0]
+	switch -regexp $v {
+		{^--host=.*} - {^--target=.*} - {^--build=.*} {
+			lappend configureopts $v
+			set argv [lrange $argv 1 end]
+		}
+		{^--disable-threads$} - {^--enable-threads$} {
+			lappend configureopts $v
+			set argv [lrange $argv 1 end]
+		}
+		{^--version$} {
+			set tclversion $v
+			set argv [lrange $argv 1 end]
+		}
+		default break
+	}
+}
+
 set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
 
 if {[lsearch $argv crosswin] != -1} {
@@ -194,17 +215,24 @@ file_write $file $c
 
 puts "compiling tcl ($tcldir)"
 cd $tcldir
+if {$threaded} {
+	lappend configureopts {--enable-threads}
+} else {
+	lappend configureopts {--disable-threads}
+}
+if {$platform eq "crosswin"} {
+	lappend configureopts {--host=i686-pc-mingw32}
+}
 if {[lsearch $argv noreconfig] == -1} {
 	catch {outexec make distclean}
-	if {$threaded} {
-		set opts {--enable-threads}
-	} else {
-		set opts {--disable-threads}
+	puts "$sh ./configure $sharedopt $configureopts --disable-symbols -prefix=$dirtcldir"
+	set error [catch {
+		eval {outexec $sh ./configure} $sharedopt $configureopts {--disable-symbols -prefix=$dirtcldir}
+	} errormsg]
+	if {$error && ($errormsg ne "configure: WARNING: If you wanted to set the --build type, don't use --host.
+    If a cross compiler is detected then cross compile mode will be used.")} {
+		error $errormsg
 	}
-	if {$platform eq "crosswin"} {
-		lappend opts {--host=i686-pc-mingw32}
-	}
-	eval {outexec $sh ./configure} $sharedopt $opts {--disable-symbols -prefix=$dirtcldir}
 }
 catch {outexec make} e
 puts $e
@@ -225,16 +253,11 @@ puts "compiling tk ($tkdir)"
 cd $tkdir
 if {[lsearch $argv noreconfig] == -1} {
 	catch {outexec make distclean}
-	if {$threaded} {
-		set opts {--enable-threads}
-	} else {
-		set opts {--disable-threads}
-	}
-	if {$platform eq "crosswin"} {
-		lappend opts {--host=i686-pc-mingw32}
-	}
-	catch {eval {outexec sh ./configure --enable-shared --disable-symbols} $opts {--with-tcl=$tcldir -prefix=$dirtcldir}} e
-	puts $e
+	puts "$sh ./configure --enable-shared --disable-symbols $configureopts --with-tcl=$tcldir -prefix=$dirtcldir"
+	set error [catch {
+		eval {outexec $sh ./configure --enable-shared --disable-symbols} $configureopts {--with-tcl=$tcldir -prefix=$dirtcldir}
+	} errormsg]
+	puts $errormsg
 }
 catch {outexec make} e
 puts $e
@@ -304,7 +327,7 @@ close $f
 if {$platform eq "unix"} {
 	set keeppwd [pwd]
 	cd $dirtcldir
-	exec ln -s [lindex [glob tclsh*] 0] example$ext
+	exec ln -s [lindex [glob tclsh8*] 0] example$ext
 	cd $keeppwd
 } else {
 	file copy -force [lindex [glob $dirtcldir/tclsh*] 0] $dirtcldir/example$ext
@@ -323,7 +346,7 @@ close $f
 if {$platform eq "unix"} {
 	set keeppwd [pwd]
 	cd $dirtcldir
-	exec ln -s [lindex [glob tclsh*] 0] tkexample$ext
+	exec ln -s [lindex [glob tclsh8*] 0] tkexample$ext
 	cd $keeppwd
 } else {
 	file copy -force [lindex [glob $dirtcldir/wish*] 0] $dirtcldir/tkexample$ext
@@ -343,7 +366,7 @@ close $f
 if {$platform eq "unix"} {
 	set keeppwd [pwd]
 	cd $dirtcldir
-	exec ln -s [lindex [glob tclsh*] 0] demos$ext
+	exec ln -s [lindex [glob tclsh8*] 0] demos$ext
 	cd $keeppwd
 } else {
 	file copy -force [lindex [glob $dirtcldir/wish*] 0] $dirtcldir/demos$ext
