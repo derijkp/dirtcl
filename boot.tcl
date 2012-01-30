@@ -97,8 +97,8 @@ if {$app_base eq "tclsh" } {
 	if { ![file isfile $bootscript] } {
 		error "Application directory not found. This executable will only work correctly when it is located in its application directory. It can be run from another location by using a link to it"
 	}
+	if {[info exists argv1]} {set argv [linsert $argv 0 $argv1]}
 	if {[file normalize [info nameofexecutable]] ne [file normalize $argv0]} {
-		if {[info exists argv0]} {set argv [linsert $argv 0 $argv0]}
 		set argv0 $bootscript
 	}
 	set tcl_boot $bootscript

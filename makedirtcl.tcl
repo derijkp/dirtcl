@@ -146,9 +146,12 @@ static char initScript[] =
 
 # code to do the conversion
 # -------------------------
+
 foreach dir [list $basetcldir/unix $basetcldir/win] {
-puts "converting $dir/tclAppInit.c"
+# convert tclAppInit.c
+# -----------------
 set file $dir/tclAppInit.c
+puts "converting $file"
 if {![file exists $file.orig]} {
 	file copy $file $file.orig
 }
@@ -176,10 +179,26 @@ set c [rewrite_before "return TCL_OK" $c {
 file_write $file $c
 }
 
+# convert tclMain.c
+# -----------------
+set file $basetcldir/generic/tclMain.c
+puts "converting $file"
+if {![file exists $file.orig]} {
+	file copy $file $file.orig
+}
+set c [file_read $file.orig]
+set c [rewrite_before "#include \"tclInt.h\"" $c "#define DIRTCL 1\n"]
+set c [rewrite_after {Tcl_SetStartupScript(path, encodingName);} $c {
+#ifdef DIRTCL
+	Tcl_SetVar(interp, "argv1", Tcl_DStringValue(&appName), TCL_GLOBAL_ONLY);
+#endif /* DIRTCL */
+}]
+file_write $file $c
+
 # convert winMain.c
 # -----------------
-puts "converting winMain.c"
 set file $basetkdir/win/winMain.c
+puts "converting $file"
 if {![file exists $file.orig]} {
 	file copy $file $file.orig
 }
