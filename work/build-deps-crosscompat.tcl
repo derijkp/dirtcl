@@ -3,6 +3,7 @@ if 0 {
 cd ~/extern
 wget -c http://kegel.com/crosstool/crosstool-0.43.tar.gz
 tar -xzvf crosstool-0.43.tar.gz
+
 cd ~/extern/crosstool-0.43
 # edit demo-i686.sh to uncomment the target wanted
 cedit demo-i686.sh
@@ -15,10 +16,11 @@ ln -s /usr/bin/gcc34 bin/gcc
 PATH=~/extern/crosstool-0.43/bin:/home/peter/apps/make3.81/bin:$PATH ./demo-i686.sh
 
 # 64 bit
+cd ~/extern/crosstool-0.43
 # edit demo-x86_64.sh to uncomment the target wanted
 cedit demo-x86_64.sh
 # PATH because of error with building gcc-3.3.6-glibc-2.2.2 with make 3.82
-PATH=/home/peter/apps/make3.81/bin:$PATH ./demo-x86_64.sh
+# PATH=/home/peter/apps/make3.81/bin:$PATH ./demo-x86_64.sh
 # getting gcc-3.3.6-glibc-2.3.2.dat to compile on fedora 16
 # install compat-gcc-34
 mkdir bin
