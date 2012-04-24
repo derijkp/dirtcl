@@ -16,7 +16,7 @@ unset LD
 unset RANLIB
 #export LD_RUN_PATH=/usr/lib:/usr/local/lib
 
-export CROSSTARGET="gcc-3.3.6-glibc-2.3.2"
+export CROSSTARGET="gcc-4.1.0-glibc-2.3.2"
 export TARGETARCHITECTURE=i686
 
 export TARGET="$TARGETARCHITECTURE-unknown-linux-gnu"
@@ -24,7 +24,7 @@ export CROSSBASE="/opt/crosstool/$CROSSTARGET/$TARGET"
 export CROSSNBASE="$CROSSBASE/$TARGET"
 export CROSSBIN="$CROSSBASE/bin"
 export CROSSNBIN="$CROSSNBASE/bin"
-export BASE=~/extern/deps-$ARCHITECTURE-$CROSSTARGET
+export BASE=~/extern/deps-$TARGETARCHITECTURE-$CROSSTARGET
 export LDFLAGS="-L$CROSSNBASE/lib"
 export CPPFLAGS="-I$CROSSNBASE/include"
 export CFLAGS="-I$CROSSNBASE/include"
@@ -34,4 +34,11 @@ export CFLAGS="-I$CROSSNBASE/include"
 #export RANLIB=${CROSS_COMPILE}ranlib
 export CROSS_COMPILE="$TARGET-"
 export DISCIMAGE=$CROSSNBASE
+export PKG_CONFIG_PATH=$CROSSNBASE/lib/pkgconfig:$CROSSNBASE/share/pkgconfig
+# export ACLOCAL="aclocal -I $CROSSNBASE/share/aclocal"
+export PREFIX=$CROSSNBASE
+
 if ! $( echo "$PATH" | tr ":" "\n" | grep -qx "$CROSSNBIN" ) ; then PATH=$CROSSNBIN:$PATH ; fi
+if ! $( echo "$PATH" | tr ":" "\n" | grep -qx "$CROSSBIN" ) ; then PATH=$PATH:$CROSSBIN ; fi
+
+DIRTCL=$HOME/tcl/dirtcl-${TARGETARCHITECTURE}-${CROSSTARGET}

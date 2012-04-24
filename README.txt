@@ -46,7 +46,8 @@ System requirements and Installation
 ------------------------------------
 makedirtcl.tcl is a Tcl script, and only needs a relatively recent version of Tcl (>=8.4).
 Running the script will install a dirtcl in the current directory (which must be empty)
-The Tcl and Tk sources (default 8.5.11) must be installed next to the dirtcl (../tcl8.5.11, ../tk8.5.11).
+The Tcl and Tk sources (default 8.5.10) must be installed next to the dirtcl
+(../tcl8.5.10, ../tk8.5.10).
 These sources will be patched, so do not mix with regular installs.
 
 mkdir dirtcl
@@ -55,8 +56,10 @@ cd dirtcl
 
 You can give several options:
  --enable-threads or --disable-threads : create a thread enabled version of Tcl or not
- --version : use to compile a different version of Tcl (The patching happens intelligently, but 
-large changes between versions are not necesarily coped with)
+ --version : use to compile a different version of Tcl (The patching 
+             happens intelligently, but large changes between versions 
+             are not necesarily coped with)
+ --host and --build: for crosscompiling
 
 Bugs
 ----

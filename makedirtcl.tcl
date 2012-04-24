@@ -2,13 +2,13 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.5.11
+set tclversion 8.5.10
 set threaded 0
 
 set configureopts {}
 while 1 {
 	set v [lindex $argv 0]
-	switch -regexp $v {
+	switch -regexp -- $v {
 		{^--host=.*} - {^--target=.*} - {^--build=.*} {
 			lappend configureopts $v
 			set argv [lrange $argv 1 end]
@@ -16,10 +16,11 @@ while 1 {
 		{^--disable-threads$} - {^--enable-threads$} {
 			lappend configureopts $v
 			set argv [lrange $argv 1 end]
+			set threaded -1
 		}
 		{^--version$} {
-			set tclversion $v
-			set argv [lrange $argv 1 end]
+			set tclversion [lindex $argv 1]
+			set argv [lrange $argv 2 end]
 		}
 		default break
 	}
@@ -234,13 +235,18 @@ file_write $file $c
 
 puts "compiling tcl ($tcldir)"
 cd $tcldir
-if {$threaded} {
+if {$threaded == -1} {
+} elseif {$threaded} {
 	lappend configureopts {--enable-threads}
 } else {
 	lappend configureopts {--disable-threads}
 }
 if {$platform eq "crosswin"} {
-	lappend configureopts {--host=i686-pc-mingw32}
+	lappend configureopts {--host=i686-pc-mingw32} {--build=i686-unknown-linux-gnu}
+	file mkdir -force $tcldir/lib/tcl8.5
+	file copy -force $scriptdir/localbuildboot.tcl $tcldir/lib/boot.tcl
+	file copy -force $scriptdir/extension.tcl $tcldir/lib/tcl8.5/
+	file copy -force $tcldir/../library/tm.tcl $tcldir/lib/tcl8.5/
 }
 if {[lsearch $argv noreconfig] == -1} {
 	catch {outexec make distclean}
