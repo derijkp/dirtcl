@@ -13,3 +13,7 @@ cd mxe
 make gcc
 make
 cp -r usr /opt/crosstool/i686-pc-mingw32
+
+cd /opt/crosstool/i686-pc-mingw32
+mkdir i686-pc-mingw32/include/linux
+cp -r ./lib/gcc/i686-pc-mingw32/4.7.0/include/* i686-pc-mingw32/include/linux
