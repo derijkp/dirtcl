@@ -60,6 +60,7 @@ if {$app_base eq "tclsh" } {
 	}
 } elseif {$app_base eq "tca" } {
 	package require Tk
+	package require tca
 	if {[file normalize $argv0] eq "[file normalize $tcl_executable]"} {error "no file to run given"}
 	if {![llength $argv]} {
 		if {![file exists $argv0]} {error "file $argv0 does not exist"}
@@ -72,7 +73,6 @@ if {$app_base eq "tclsh" } {
 		foreach {tca_host tca_cookie srcfile argv} $argv break
 		set checkupdate 0
 	}
-	package require tca
 	if {$checkupdate && [tca_updateneeded]} {
 		tca_update tca_update$tcl_platform(execextension)
 		exec [file join $tca_base tca_update$tcl_platform(execextension)] $tca_host $tca_cookie $srcfile $argv &
