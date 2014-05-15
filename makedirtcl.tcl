@@ -26,7 +26,7 @@ while 1 {
 	}
 }
 
-set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
+set  [join [lrange [split $tclversion .] 0 1] .]
 
 if {[lsearch $argv crosswin] != -1} {
 	set platform crosswin
@@ -91,14 +91,27 @@ proc file_write {file data} {
 	close $f
 }
 
-proc rewrite_before {pattern c insert} {
-	set pos [string first $pattern $c]
-	return [string range $c 0 [expr {$pos-1}]]$insert[string range $c $pos end]
+proc rewrite_before {args} {
+	foreach {c insert} [lrange $args end-1 end] break
+	set args [lrange $args 0 end-2]
+	foreach pattern $args {
+		set pos [string first $pattern $c]
+		if {$pos == -1} continue
+		return [string range $c 0 [expr {$pos-1}]]$insert[string range $c $pos end]
+	}
+	error "\"$args\" not found"
 }
 
-proc rewrite_after {pattern c insert} {
-	set pos [expr {[string first $pattern $c] + [string length $pattern]}]
-	return [string range $c 0 [expr {$pos-1}]]$insert[string range $c $pos end]
+proc rewrite_after {args} {
+	foreach {c insert} [lrange $args end-1 end] break
+	set args [lrange $args 0 end-2]
+	foreach pattern $args {
+		set pos [string first $pattern $c]
+		if {$pos == -1} continue
+		set pos [expr {$pos + [string length $pattern]}]
+		return [string range $c 0 [expr {$pos-1}]]$insert[string range $c $pos end]
+	}
+	error "\"$args\" not found"
 }
 
 proc outexec {args} {
@@ -157,9 +170,11 @@ if {![file exists $file.orig]} {
 	file copy $file $file.orig
 }
 set c [file_read $file.orig]
-set c [rewrite_before "#include \"tcl.h\"" $c "#define DIRTCL 1\n"]
+set c [rewrite_before "#include \"tcl.h\"" $c {#define DIRTCL 1
+#include "tclInt.h"
+}]
 set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
-set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c {
+set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" "if ((Tcl_Init)(interp) == TCL_ERROR)" $c {
 #ifdef DIRTCL
     Tcl_Obj *temp;
     TclSetPreInitScript(preInitCmd);
@@ -189,11 +204,24 @@ if {![file exists $file.orig]} {
 }
 set c [file_read $file.orig]
 set c [rewrite_before "#include \"tclInt.h\"" $c "#define DIRTCL 1\n"]
+if {[catch {
+
 set c [rewrite_after {Tcl_SetStartupScript(path, encodingName);} $c {
 #ifdef DIRTCL
 	Tcl_SetVar(interp, "argv1", Tcl_DStringValue(&appName), TCL_GLOBAL_ONLY);
 #endif /* DIRTCL */
 }]
+
+}]} {
+
+# for Tcl8.6
+set c [rewrite_after {appName = path;} $c {
+#ifdef DIRTCL
+	Tcl_SetVar(interp, "argv1", Tcl_GetStringFromObj(appName,NULL), TCL_GLOBAL_ONLY);
+#endif /* DIRTCL */
+}]
+
+}
 file_write $file $c
 
 # convert winMain.c
