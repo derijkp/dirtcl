@@ -10,7 +10,7 @@ make distclean
 ../configure --host=$HOST --build=i386-linux
 make
 
-# generic cross-compile for simple makefiles (can of course also be used with configure, ...)
+# generic cross-compile for simple makefiles (can also be used with configure, ...)
 # This is based on tools in $CROSSNBASE, that are not postfixed with target, must be in path before rest.
 . /opt/crosstool/cross-compat-i686-gcc-4.1.0-glibc-2.3.2.sh
 PATH=$CROSSNBIN:$PATH make

@@ -13,7 +13,7 @@ mkdir -p $base/../downloads || true
 
 cd $base
 # settings for cross-compilation
-. ~/dev/dirtcl/work/cross-compat-$arch-$target.sh
+. ~/dev/dirtcl/build/cross-compat-$arch-$target.sh
 
 
 function compile {
@@ -40,8 +40,12 @@ function compile {
         make distclean || true
         echo "-- Configuring $file"
         if [[ "${file}" == "openssl-0.9.8h.tar.gz" ]]; then
-            PATH=$PATH:$CROSSBIN ./Configure linux-elf no-asm shared --prefix=$CROSSNBASE
-            # PATH=$PATH:$CROSSBIN make install >> log
+            PATH=$CROSSBIN:$PATH ./Configure linux-elf no-asm shared --prefix=$CROSSNBASE
+            # PATH=$CROSSBIN:$PATH make install >> log
+        elif [[ "${file}" == "openssl-1.0.1c.tar.gz" ]]; then
+            PATH=$CROSSBIN:$PATH ./Configure linux-elf no-asm shared --prefix=$CROSSNBASE
+            PATH=$CROSSBIN:$PATH make install >> log
+            PATH=$CROSSBIN:$PATH make install >> log
         elif  [ "${file}" == "libX11-X11R7.1-1.0.1.tar.bz2" ]; then
             # cp ../libX11-1.2/src/util/makekeys.c src/util/makekeys.c
             ./configure --prefix=$CROSSNBASE >> log
@@ -50,20 +54,26 @@ function compile {
         elif  [[ "${file}" == "xcb-proto-1.7.tar.bz2" ]]; then
             ./configure --prefix=$CROSSNBASE --without-python >> log
         elif  [ "${file}" == "fontconfig-2.9.0.tar.gz" ]; then
-                ./configure --prefix=$CROSSNBASE >> log
-		cp Makefile Makefile.ori
-		sed -e 's/fc-cache\//#fc-cache\//' Makefile.ori > Makefile
+            ./configure --prefix=$CROSSNBASE >> log
+            cp Makefile Makefile.ori
+            sed -e 's/fc-cache\//#fc-cache\//' Makefile.ori > Makefile
         elif  [ "${file}" == "libX11-1.2.tar.bz2" ]; then
-	    echo "only needed for makekeys.c"
+            echo "only needed for makekeys.c"
         elif  [ "${file}" == "libgcrypt-1.4.6.tar.bz2" ]; then
             ./configure --disable-aesni-support --disable-asm --enable-shared --prefix=$CROSSNBASE >> log
+        elif  [ "${file}" == "bison-2.7.tar.gz" ]; then
+            PATH=$PATH:$CROSSNBIN ./configure --prefix=$CROSSNBASE >> log
         else
             ./configure --prefix=$CROSSNBASE >> log
         fi
-	echo "-- Compiling $file"
-	make install >> log
-	echo "make finished" >> log
-	echo "make finished"
+        echo "-- Compiling $file"
+        if [[ "${file}" == "openssl-1.0.1c.tar.gz" ]]; then
+            echo 'nothing'
+        else
+            make install >> log
+        fi
+        echo "make finished" >> log
+        echo "make finished"
     fi
 }
 
@@ -90,7 +100,7 @@ http://ftp.easynet.be/ftp/gnu/libtool/libtool-2.4.tar.gz \
 http://zlib.net/zlib-1.2.6.tar.gz \
 http://sourceforge.net/projects/libpng/files/libpng15/older-releases/1.5.2/libpng-1.5.2.tar.gz \
 http://sourceforge.net/projects/expat/files/expat/2.0.1/expat-2.0.1.tar.gz \
-http://www.openssl.org/source/openssl-0.9.8h.tar.gz \
+http://www.openssl.org/source/openssl-1.0.1c.tar.gz \
 ftp://xmlsoft.org/libxml2/libxml2-2.7.8.tar.gz \
 ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.20.tar.gz \
 http://www.sqlite.org/sqlite-autoconf-3071000.tar.gz \
@@ -103,7 +113,9 @@ http://sourceforge.net/projects/freetype/files/freetype2/2.4.9/freetype-2.4.9.ta
 http://freedesktop.org/software/fontconfig/release/fontconfig-2.9.0.tar.gz \
 ftp://ftp.gnupg.org/gcrypt/libgpg-error/libgpg-error-1.10.tar.bz2 \
 ftp://ftp.gnupg.org/gcrypt/libgcrypt/libgcrypt-1.4.6.tar.bz2 \
-ftp://xmlsoft.org/libxslt/libxslt-1.1.26.tar.gz 
+ftp://xmlsoft.org/libxslt/libxslt-1.1.26.tar.gz \
+http://ftp.gnu.org/gnu/m4/m4-1.4.16.tar.gz \
+http://ftp.gnu.org/gnu/bison/bison-2.7.tar.gz
 do
     file=${url##*/}
     echo "----------------------------------------------------------------------------------------"
@@ -234,3 +246,4 @@ do
 done
 
 echo "Finished" >> log
+echo "Finished"

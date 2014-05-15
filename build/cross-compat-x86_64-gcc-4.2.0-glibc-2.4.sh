@@ -16,8 +16,8 @@ unset LD
 unset RANLIB
 #export LD_RUN_PATH=/usr/lib:/usr/local/lib
 
-export CROSSTARGET="gcc-4.1.0-glibc-2.3.2"
-export TARGETARCHITECTURE=i686
+export CROSSTARGET="gcc-4.2.0-glibc-2.4"
+export TARGETARCHITECTURE=x86_64
 
 export TARGET="$TARGETARCHITECTURE-unknown-linux-gnu"
 export HOST="$TARGET"
@@ -40,6 +40,6 @@ export PKG_CONFIG_PATH=$CROSSNBASE/lib/pkgconfig:$CROSSNBASE/share/pkgconfig
 export PREFIX=$CROSSNBASE
 
 # if ! $( echo "$PATH" | tr ":" "\n" | grep -qx "$CROSSNBIN" ) ; then PATH=$CROSSNBIN:$PATH ; fi
-if ! $( echo "$PATH" | tr ":" "\n" | grep -qx "$CROSSBIN" ) ; then PATH=$PATH:$CROSSBIN ; fi
+if ! $( echo "$PATH" | tr ":" "\n" | grep -qx "$CROSSBIN" ) ; then PATH=$CROSSBIN:$PATH ; fi
 
 DIRTCL=$HOME/tcl/dirtcl-${TARGETARCHITECTURE}-${CROSSTARGET}

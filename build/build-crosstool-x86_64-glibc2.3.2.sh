@@ -7,7 +7,7 @@
 
 cd ~/extern/crosstool-0.43
 # adapt patch for gcc 4.*
-#cp ~/dev/dirtcl/work/glibc-2.3.3-allow-gcc-4.0-configure.patch patches/glibc-2.3.2
+#cp ~/dev/dirtcl/build/glibc-2.3.3-allow-gcc-4.0-configure.patch patches/glibc-2.3.2
 
 # glibc 2.3.2 will not compile using recent gcc, add a link to an older one in bin, and put in path
 # glibc 2.3.2 will not compile using recent gcc, put older one in path

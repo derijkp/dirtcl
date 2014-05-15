@@ -3,10 +3,10 @@ set -ex
 
 export target="mingw32"
 export arch=i686-pc
-export tclversion=8.5.10
+export tclversion=8.5.14
 
 # settings for cross-compilation
-. $HOME/dev/dirtcl/work/cross-compat-$arch-$target.sh
+. $HOME/dev/dirtcl/build/cross-compat-$arch-$target.sh
 
 # build dirtl
 rm -f $HOME/tcl/dirtcl-$arch-$target
