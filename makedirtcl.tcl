@@ -26,7 +26,7 @@ while 1 {
 	}
 }
 
-set  [join [lrange [split $tclversion .] 0 1] .]
+set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
 
 if {[lsearch $argv crosswin] != -1} {
 	set platform crosswin
