@@ -1,5 +1,7 @@
 #!/bin/sh
 
+PS1='insh % '
+
 # trying crosstools-ng 
 #cd ~/extern
 #export ctversion=1.5.3
@@ -57,7 +59,7 @@ unset LD_LIBRARY_PATH
 #GCC_EXTRA_CONFIG="LDFLAGS=-static"
 
 # from demo-i686
-set -ex
+## set -ex
 export TARBALLS_DIR=$HOME/downloads
 export RESULT_TOP=/opt/crosstool
 export GCC_LANGUAGES="c,c++"
@@ -79,18 +81,78 @@ export GCC_EXTRA_CONFIG="$GLIBC_EXTRA_CONFIG --with-arch=pentium3 --with-tune=pe
 #export GLIBC_EXTRA_CONFIG="$GLIBC_EXTRA_CONFIG --with-tls --with-__thread  --enable-kernel=2.4.18"
 #export GLIBC_ADDON_OPTIONS="=nptl"
 
-# gcc-4.2.0-glibc-2.4-nptl.dat
-#export BINUTILS_DIR=binutils-2.16.1
-export BINUTILS_DIR=binutils-2.17
+## gcc-4.2.0-glibc-2.4-nptl.dat
+##export BINUTILS_DIR=binutils-2.16.1
+#export BINUTILS_DIR=binutils-2.17
+#export BINUTILS_EXTRA_CONFIG="$BINUTILS_EXTRA_CONFIG --disable-werror"
+#export GCC_CORE_DIR=gcc-4.2.0
+#export GCC_DIR=gcc-4.2.0
+#export GLIBC_DIR=glibc-2.4
+#export LINUX_DIR=linux-2.6.15
+#export LINUX_SANITIZED_HEADER_DIR=linux-libc-headers-2.6.12.0
+#export GDB_DIR=gdb-6.5a
+#export GLIBC_EXTRA_CONFIG="$GLIBC_EXTRA_CONFIG --with-tls --with-__thread  --enable-kernel=2.4.18"
+#export GLIBC_ADDON_OPTIONS="=nptl"
+
+#mkdir -p /home/peter/extern/crosstool-svn/build/i686-unknown-linux-gnu/gcc-4.4.1-glibc-2.4/
+#cd ~/extern/crosstool-svn/build/i686-unknown-linux-gnu/gcc-4.4.1-glibc-2.4/
+#wget https://gmplib.org/download/gmp/gmp-4.1.4.tar.bz2
+#tar xvjf gmp-4.1.4.tar.bz2
+#ln -s gmp-4.1.4 gmp
+#wget http://www.mpfr.org/mpfr-2.3.2/mpfr-2.3.2.tar.bz2
+#tar xvjf mpfr-2.3.2.tar.bz2
+#ln -s mpfr-2.3.2 mpfr
+#cd ~/extern/crosstool-svn
+
+## gcc-4.4.1-glibc-2.4-nptl.dat
+##export BINUTILS_DIR=binutils-2.16.1
+#export BINUTILS_DIR=binutils-2.19.1
+#export BINUTILS_EXTRA_CONFIG="$BINUTILS_EXTRA_CONFIG --disable-werror"
+#export GCC_CORE_DIR=gcc-4.4.1
+#export GCC_DIR=gcc-4.4.1
+#export GLIBC_DIR=glibc-2.4
+#export LINUX_DIR=linux-2.6.15
+#export LINUX_SANITIZED_HEADER_DIR=linux-libc-headers-2.6.12.0
+#export GDB_DIR=gdb-6.5a
+#export GLIBC_EXTRA_CONFIG="$GLIBC_EXTRA_CONFIG --with-tls --with-__thread  --enable-kernel=2.4.18"
+#export GLIBC_ADDON_OPTIONS="=nptl"
+#export GMP_DIR=gmp-4.1.4
+#export MPFR_DIR=mpfr-2.3.2
+#export CT_CC_EXTRA_CONFIG="--disable-libstdcxx-pch"
+
+if false; then
+    cd /home/peter/build/i686-unknown-linux-gnu/gcc-4.9.1-glibc-2.4
+    diff -Naur glibc-2.4/configure.in.old glibc-2.4/configure.in > ~/extern/crosstool-svn/patches/glibc-2.4/glibc-2.4-configure.in-newer_gcc_and_binutils.patch
+    diff -Naur glibc-2.4/configure.old glibc-2.4/configure > ~/extern/crosstool-svn/patches/glibc-2.4/glibc-2.4-configure-newer_gcc_and_binutils.patch
+fi
+
+# sudo apt-get install texinfo m4 flex bison
+# gcc-4.9.1-glibc-2.4-nptl.dat
+#if ln -s /usr/bin/ar $HOME/bin/x86_64-host_unknown-linux-gnu-ar 2> /dev/null; then echo 'link ar ok'; fi
+#if ln -s /usr/bin/as $HOME/bin/x86_64-host_unknown-linux-gnu-as 2> /dev/null; then echo 'link as ok'; fi
+export BINUTILS_DIR=binutils-2.24
+#export BINUTILS_DIR=binutils-2.19.1
 export BINUTILS_EXTRA_CONFIG="$BINUTILS_EXTRA_CONFIG --disable-werror"
-export GCC_CORE_DIR=gcc-4.2.0
-export GCC_DIR=gcc-4.2.0
+export GCC_CORE_DIR=gcc-4.9.1
+export GCC_DIR=gcc-4.9.1
 export GLIBC_DIR=glibc-2.4
 export LINUX_DIR=linux-2.6.15
 export LINUX_SANITIZED_HEADER_DIR=linux-libc-headers-2.6.12.0
 export GDB_DIR=gdb-6.5a
 export GLIBC_EXTRA_CONFIG="$GLIBC_EXTRA_CONFIG --with-tls --with-__thread  --enable-kernel=2.4.18"
+# export GLIBC_EXTRA_CONFIG="--with-__thread  --enable-kernel=2.4.18"
 export GLIBC_ADDON_OPTIONS="=nptl"
+#export GMP_DIR=gmp-6.0.0
+#export MPFR_DIR=mpfr-3.1.2
+#export MPC_DIR=mpc-1.0.2
+export CT_CC_EXTRA_CONFIG="--disable-libstdcxx-pch"
+
+export TOOLCOMBO=$GCC_DIR-$GLIBC_DIR
+mkdir $HOME/extern/crosstool-build
+export BUILD_DIR=$HOME/extern/crosstool-build/$TARGET/$TOOLCOMBO
+
+opt_no_test=1
+opt_no_unpack=1
 
 # run crosstool
-sh all.sh --notest
+sh all.sh --notest 2>&1 | tee ~/extern/log-crosstool

@@ -3,7 +3,7 @@ set -ex
 
 export target="gcc-4.1.0-glibc-2.3.2"
 export arch=x86_64
-export tclversion=8.5.10
+export tclversion=8.5.19
 
 # settings for cross-compilation
 . $HOME/dev/dirtcl/build/cross-compat-$arch-$target.sh

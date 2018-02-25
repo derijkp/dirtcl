@@ -1,8 +1,9 @@
 #!/bin/bash
 set -ex
 
-target="gcc-4.2.0-glibc-2.4"
-arch=x86_64
+PS1="deps-i686 \W % "
+target="gcc-4.9.2-glibc-2.4"
+arch=i686
 base=~/extern/deps-$arch-$target
 xversion=X11R7.0
 
@@ -10,7 +11,7 @@ xversion=X11R7.0
 # sudo apt-get install xsltproc
 
 # settings for cross-compilation
-. ~/dev/dirtcl/build/cross-compat-$arch-$target.sh
+. /opt/crosstool/cross-compat-$arch-$target.sh
 
 . ~/dev/dirtcl/build/buildtools.sh
 
@@ -23,24 +24,16 @@ cd $base
 
 #http://cairographics.org/releases/pixman-0.24.4.tar.gz 
 
-#ftp://ftp.gnu.org/gnu/pth/pth-2.0.7.tar.gz \
-##ftp://ftp.gnupg.org/gcrypt/libksba/libksba-1.2.0.tar.bz2 \
-##ftp://ftp.gnupg.org/gcrypt/libassuan/libassuan-2.0.3.tar.bz2 \
-#ftp://ftp.gnupg.org/gcrypt/gnupg/gnupg-2.0.18.tar.bz2 \
-#
-
 cd $base
 download_ccompile http://ftp.easynet.be/ftp/gnu/libtool/libtool-2.4.tar.gz
-ln -s $CROSSNBIN/libtool $CROSSBIN/x86_64-unknown-linux-gnu-libtool
-download_compile http://zlib.net/zlib-1.2.6.tar.gz
-download_ccompile http://curl.haxx.se/download/curl-7.33.0.tar.gz
-download_ccompile http://ftp.gnu.org/pub/gnu/gettext/gettext-0.18.3.1.tar.gz
-download_compile http://sourceforge.net/projects/libpng/files/libpng15/older-releases/1.5.2/libpng-1.5.2.tar.gz
-download_compile http://sourceforge.net/projects/expat/files/expat/2.0.1/expat-2.0.1.tar.gz
-download_compile http://www.openssl.org/source/openssl-1.0.1g.tar.gz
-download_compile ftp://xmlsoft.org/libxml2/libxml2-2.7.8.tar.gz
-download_ccompile ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.20.tar.gz --enable-utf8
-download_compile http://www.sqlite.org/sqlite-autoconf-3071000.tar.gz
+download_compile http://zlib.net/zlib-1.2.8.tar.gz
+download_ccompile http://sourceforge.net/projects/libpng/files/libpng15/older-releases/1.5.2/libpng-1.5.2.tar.gz
+download_ccompile http://sourceforge.net/projects/expat/files/expat/2.0.1/expat-2.0.1.tar.gz
+# download_compile http://www.openssl.org/source/openssl-1.0.1j.tar.gz
+download_compile http://www.openssl.org/source/openssl-1.0.2a.tar.gz
+download_ccompile ftp://xmlsoft.org/libxml2/libxml2-2.7.8.tar.gz
+download_ccompile ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.36.tar.gz
+download_compile http://www.sqlite.org/2014/sqlite-autoconf-3080704.tar.gz
 download_compile http://xcb.freedesktop.org/dist/libpthread-stubs-0.3.tar.bz2
 download_compile http://xorg.freedesktop.org/archive/individual/lib/libpciaccess-0.12.902.tar.gz
 download_compile http://dri.freedesktop.org/libdrm/libdrm-2.3.1.tar.gz
@@ -51,7 +44,7 @@ download_compile http://xcb.freedesktop.org/dist/xcb-proto-1.7.tar.bz2
 # so the build process can delete it, iso giving an error
 #download_compile http://sourceforge.net/projects/freetype/files/freetype2/2.4.9/freetype-2.4.9.tar.gz || true
 download http://sourceforge.net/projects/freetype/files/freetype2/2.4.9/freetype-2.4.9.tar.gz || true
-mkdir $CROSSNBASE/include/freetype2/freetype/internal || true
+mkdir -p $CROSSNBASE/include/freetype2/freetype/internal || true
 compile http://sourceforge.net/projects/freetype/files/freetype2/2.4.9/freetype-2.4.9.tar.gz
 #
 download_compile http://freedesktop.org/software/fontconfig/release/fontconfig-2.9.0.tar.gz
@@ -95,7 +88,5 @@ download_ccompile $xurl/renderproto-X11R7.0-0.9.2.tar.bz2
 download_ccompile $xurl/libXrender-X11R7.0-0.9.0.2.tar.bz2
 download_ccompile $xurl/libXft-X11R7.0-2.1.8.2.tar.bz2
 
-download_compile ftp://ftp.cwru.edu/pub/bash/readline-6.3.tar.gz
-
-download_compile http://www.python.org/ftp/python/2.7.5/Python-2.7.5.tgz
 echo "Finished" >> log
+echo "Finished"

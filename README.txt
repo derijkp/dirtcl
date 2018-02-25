@@ -46,8 +46,8 @@ System requirements and Installation
 ------------------------------------
 makedirtcl.tcl is a Tcl script, and only needs a relatively recent version of Tcl (>=8.4).
 Running the script will install a dirtcl in the current directory (which must be empty)
-The Tcl and Tk sources (default 8.5.10) must be installed next to the dirtcl
-(../tcl8.5.10, ../tk8.5.10).
+The Tcl and Tk sources (default 8.5.19) must be installed next to the dirtcl
+(../tcl8.5.19, ../tk8.5.19).
 These sources will be patched, so do not mix with regular installs.
 
 mkdir dirtcl
@@ -89,7 +89,7 @@ E-mail: Peter.DeRijk@gmail.com
 
 Legalities
 ----------
-RnaViz is Copyright Peter De Rijk, University of Antwerp (UA), 2012
+dirtcl is Copyright Peter De Rijk, University of Antwerp (UA), 2012
 
 following terms apply to all files associated with the software unless
 explicitly disclaimed in individual files.

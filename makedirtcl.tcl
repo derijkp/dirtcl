@@ -2,7 +2,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.5.10
+set tclversion 8.5.19
 set threaded 0
 
 set configureopts {}
@@ -232,7 +232,7 @@ if {![file exists $file.orig]} {
 	file copy $file $file.orig
 }
 set c [file_read $file.orig]
-set c [rewrite_before "#include \"tcl.h\"" $c "#define DIRTCL 1\n"]
+set c [rewrite_before "#include \"tkInt.h\"" $c "#define DIRTCL 1\n"]
 set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
 set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c {
 #ifdef DIRTCL
@@ -269,8 +269,9 @@ if {$threaded == -1} {
 } else {
 	lappend configureopts {--disable-threads}
 }
+puts platform=$platform
 if {$platform eq "crosswin"} {
-	lappend configureopts {--host=i686-pc-mingw32} {--build=i686-unknown-linux-gnu}
+	lappend configureopts [list --host=$env(HOST)] {--build=i686-unknown-linux-gnu}
 	file mkdir -force $tcldir/lib/tcl8.5
 	file copy -force $scriptdir/localbuildboot.tcl $tcldir/lib/boot.tcl
 	file copy -force $scriptdir/extension.tcl $tcldir/lib/tcl8.5/

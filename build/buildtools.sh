@@ -49,14 +49,9 @@ function compile {
             # CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH make install >> log
             echo "-- Compiling $file"
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH make install >> log
-        elif [[ "${file}" == "openssl-1.0.1c.tar.gz" ]]; then
-            CFLAGS='-fPIC' PATH=$CROSSBIN:$PATH ./Configure linux-elf no-asm shared --prefix=$CROSSNBASE
-            CFLAGS='-fPIC' PATH=$CROSSBIN:$PATH make install >> log
-            CFLAGS='-fPIC' PATH=$CROSSBIN:$PATH make install >> log
-        elif [[ "${file}" == "openssl-1.0.1g.tar.gz" ]]; then
-            CFLAGS='-fPIC' PATH=$CROSSBIN:$PATH ./Configure linux-elf no-asm shared --prefix=$CROSSNBASE
-            CFLAGS='-fPIC' PATH=$CROSSBIN:$PATH make install >> log
-            CFLAGS='-fPIC' PATH=$CROSSBIN:$PATH make install >> log
+        elif [[ "${file%-*}" == "openssl" ]]; then
+            CFLAGS='-fPIC' ./Configure linux-elf no-asm shared --prefix=$CROSSNBASE --cross-compile-prefix=$CROSS_COMPILE
+            CFLAGS='-fPIC' make install >> log
         elif  [ "${file}" == "libX11-X11R7.1-1.0.1.tar.bz2" ]; then
             # cp ../libX11-1.2/src/util/makekeys.c src/util/makekeys.c
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH ./configure --prefix=$CROSSNBASE >> log
@@ -68,6 +63,10 @@ function compile {
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH make install >> log
         elif  [ "${file}" == "libxml2-2.7.8.tar.gz" ]; then
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH ./configure --prefix=$CROSSNBASE --without-python --with-pic >> log
+            echo "-- Compiling $file"
+            CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH make install >> log
+        elif  [ "${file}" == "libxml2-2.9.2.tar.gz" ]; then
+            CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH ./configure --prefix=$CROSSNBASE --without-python --without-lzma --with-pic >> log
             echo "-- Compiling $file"
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH make install >> log
         elif  [[ "${file}" == "xcb-proto-1.7.tar.bz2" ]]; then
@@ -92,6 +91,10 @@ function compile {
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH ./configure --prefix=$CROSSNBASE >> log
             echo "-- Compiling $file"
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH make install >> log
+        elif  [ "${file%-*}" == "zlib" ]; then
+            CHOST=$TARGET CFLAGS='-fPIC' ./configure --prefix=$CROSSNBASE >> log
+            echo "-- Compiling $file"
+            CHOST=$TARGET CFLAGS='-fPIC' make install >> log
         else
             CFLAGS='-fPIC' PATH=$CROSSNBIN:$PATH ./configure --prefix=$CROSSNBASE "$@" >> log
             echo "-- Compiling $file"
@@ -144,7 +147,7 @@ function ccompile {
 	done
         make distclean || true
         echo "-- Configuring $file $@"
-        CFLAGS='-fPIC' ./configure --host=$HOST --build=i386-linux --prefix=$CROSSNBASE --enable-malloc0returnsnull "$@" >> log
+        CFLAGS='-fPIC' ./configure --host=$HOST --build=x86_64-linux --prefix=$CROSSNBASE --enable-malloc0returnsnull "$@" >> log
         echo "-- Compiling $file"
         CFLAGS='-fPIC' make install >> log
         echo "make finished" >> log

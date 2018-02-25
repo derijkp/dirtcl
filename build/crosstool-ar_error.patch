@@ -1,0 +1,17 @@
+------------------- start of patch -------------------
+--- crosstool.sh~       2007-09-04 21:45:43.000000000 -0700
++++ crosstool.sh        2007-09-05 11:23:51.000000000 -0700
+ <at>  <at>  -372,7 +372,7  <at>  <at>  echo Build binutils
+ mkdir -p build-binutils; cd build-binutils
+
+ if test '!' -f Makefile; then
+-    ${BINUTILS_DIR}/configure $CANADIAN_BUILD --target=$TARGET 
+--host=$GCC_HOST --prefix=$PREFIX --disable-nls ${BINUTILS_EXTRA_CONFIG} 
+$BINUTILS_SYSROOT_ARG
++    ${BINUTILS_DIR}/configure --build=$GCC_HOST $CANADIAN_BUILD 
+--target=$TARGET --host=$GCC_HOST --prefix=$PREFIX --disable-nls 
+${BINUTILS_EXTRA_CONFIG} $BINUTILS_SYSROOT_ARG
+ fi
+
+ make $PARALLELMFLAGS all
+------------------- end of patch -------------------

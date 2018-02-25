@@ -1,7 +1,9 @@
-target="mingw32msvc"
-arch=i386
+#!/bin/bash
+
+target="w64-mingw32"
+arch=i686
 base=~/extern/deps-$arch-$target
-HOST=i686-pc-mingw32
+HOST=$arch-$target
 
 mkdir $base
 cd $base
@@ -47,8 +49,9 @@ function compile {
 #            PATH=$CROSSNBIN:$PATH make install
 #
             cp $CROSSNBASE/lib/crt2.o $CROSSBASE/lib/gcc/i386-mingw32msvc/3.4.1/crtbegin.o $CROSSBASE/lib/gcc/i386-mingw32msvc/3.4.1/crtend.o .
-            PATH=$CROSSNBIN:$PATH BINARY_PATH=$CROSSNBIN INCLUDE_PATH=$CROSSNBASE/include LIBRARY_PATH=$CROSSNBASE/lib make -f win32/Makefile.gcc
-            PATH=$CROSSNBIN:$PATH BINARY_PATH=$CROSSNBIN INCLUDE_PATH=$CROSSNBASE/include LIBRARY_PATH=$CROSSNBASE/lib make -f win32/Makefile.gcc install
+            echo "Edit win32/Makefile.gcc: PREFIX =i686-w64-mingw32-'
+            BINARY_PATH=$CROSSNBIN INCLUDE_PATH=$CROSSNBASE/include LIBRARY_PATH=$CROSSNBASE/lib make -f win32/Makefile.gcc
+            BINARY_PATH=$CROSSNBIN INCLUDE_PATH=$CROSSNBASE/include LIBRARY_PATH=$CROSSNBASE/lib make -f win32/Makefile.gcc install
         else
             ./configure --prefix=$CROSSNBASE --host=$HOST --build=i386-linux >> log
         fi
