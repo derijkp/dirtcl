@@ -363,7 +363,7 @@ set tclDefaultLibrary [info library]
 file_write $tcllibdir/init.tcl $c
 file mkdir $dirtcldir/pkgs
 file mkdir $dirtcldir/exts
-file copy [lindex [glob $scriptdir/pkgtools*] 0] $dirtcldir/exts
+file copy [lindex [glob $scriptdir/packages/pkgtools*] 0] $dirtcldir/exts
 
 if {$platform eq "windows"} {
 	file copy -force $tkdir/rc/wish.ico $dirtcldir/lib
