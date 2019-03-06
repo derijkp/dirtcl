@@ -1,0 +1,4 @@
+The build scripts work with the plain Holy Build Box docker.
+hbb64 and hbb32 contain dockerfiles that can be used to
+install docker images based on Holy Build Box that already have
+some extra software installed, and thus will be faster to use.

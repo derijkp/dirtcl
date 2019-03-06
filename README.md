@@ -1,6 +1,7 @@
 dirtcl
-====== Tool to create a directory based, standalone/isolated version of tcl
-       Copyright Peter De Rijk (UA)
+====== 
+Tool to create a directory based, standalone/isolated version of tcl
+       Copyright Peter De Rijk (VIB/UA)
 
 Application directories
 -----------------------
@@ -42,8 +43,17 @@ The dirtcl tclsh defines some global variables
  - app_base: base name of the tclsh executable used to start dirtcl
  - app_version: version part of the tclsh executable used to start dirtcl
 
-System requirements and Installation
-------------------------------------
+Installation: build script
+--------------------------
+The easiest way to build a distributable dirtcl (compatible with older
+systems) is to run the build/hbb_build_dirtcl.sh script. It will use the Holy
+Build Box to build a distributable application directory (dirtcl$version-$architecture)
+in the directory ~/build/bin-$arch. You can change the build directory
+using the --builddir option. By default the 64 bit version will be built,
+use the option --bits 32 to build the 32 bit version.
+
+Installation manual
+-------------------
 makedirtcl.tcl is a Tcl script, and only needs a relatively recent version of Tcl (>=8.4).
 Running the script will install a dirtcl in the current directory (which must be empty)
 The Tcl and Tk sources (default 8.5.19) must be installed next to the dirtcl
