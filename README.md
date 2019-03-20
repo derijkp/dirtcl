@@ -46,11 +46,16 @@ The dirtcl tclsh defines some global variables
 Installation: build script
 --------------------------
 The easiest way to build a distributable dirtcl (compatible with older
-systems) is to run the build/hbb_build_dirtcl.sh script. It will use the Holy
-Build Box to build a distributable application directory (dirtcl$version-$architecture)
-in the directory ~/build/bin-$arch. You can change the build directory
-using the --builddir option. By default the 64 bit version will be built,
-use the option --bits 32 to build the 32 bit version.
+systems) on linux is to run the build/hbb_build_dirtcl.sh script. It will
+use the Holy Build Box (Holy Build Box uses docker, so access to docker is
+needed) to build a distributable application directory
+(dirtcl$version-$architecture) in the directory ~/build/bin-x86_64. You
+can change the build directory using the --builddir option. By default the
+64 bit version will be built, use the option --bits 32 to build the 32 bit
+version (in ~/build/bin-ix86 by default).
+
+The script build/hbb_build_packages.sh will compile and install several
+packages in the dirtcl built earlier.
 
 Installation manual
 -------------------
