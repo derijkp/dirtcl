@@ -1,0 +1,1 @@
+cross-compat-i686-pc-mingw32.sh
