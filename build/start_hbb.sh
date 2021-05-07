@@ -1,7 +1,7 @@
 # This script is meant to be sourced in a Holy build box build script to start the HBB docker
 # it interprets the options:
 # -b|-bits|--bits: 32 for 32 bits build (default 64)
-# -d|-builddir|--builddir: top directory to build in (default ~/build/tcl$arch)
+# -d|-builddir|--builddir: top directory to build in (default ~/build/tcl-$arch)
 # and presents all options (excluding -bbuilddir) to the program in the docker
 
 # you can use the following to use in the build script
@@ -51,8 +51,8 @@ if [ ! -f /hbb_exe/activate ]; then
 	fi
 	mkdir -p "$builddir"
 	echo "Build $bits bits version"
-	echo "builddir $builddir"
-	echo "srcdir $srcdir"
+	echo "builddir=$builddir"
+	echo "srcdir=$srcdir"
 	# run the script in holy build box
 	uid=$(id -u)
 	gid=$(id -g $uid)
@@ -98,6 +98,8 @@ if [ "$1" = "stage2" ] ; then
 	useradd build --uid $uid --gid $gid
 	# usermod -a -G wheel build
 	echo "build ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-build
+	# default nr of processes (for user build) is sometimes not enough
+	sudo sed -i 's/1024/10240/' /etc/security/limits.d/90-nproc.conf
 	# (re)start script for stage 3: running the actual code
 	sudo -u build bash /io/$file "stage3" ${@:2}
 	exit
@@ -112,7 +114,68 @@ function yuminstall {
 	fi
 }
 
+# centos 6 is EOL, moved to vault: adapt the repos
+if [ "$bits" = "32" ] ; 	then
+
+cd
+echo '
+[base]
+name=CentOS-$releasever - Base
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=os&infra=$infra
+baseurl=http://vault.centos.org/centos/$releasever/os/i386/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
+
+#released updates
+[updates]
+name=CentOS-$releasever - Updates
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=updates&infra=$infra
+baseurl=http://vault.centos.org/centos/$releasever/updates/i386/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
+
+#additional packages that may be useful
+[extras]
+name=CentOS-$releasever - Extras
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=extras&infra=$infra
+baseurl=http://vault.centos.org/centos/$releasever/extras/i386/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
+
+#additional packages that extend functionality of existing packages
+[centosplus]
+name=CentOS-$releasever - Plus
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=centosplus&infra=$infra
+baseurl=http://vault.centos.org/centos/$releasever/centosplus/i386/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
+
+#contrib - packages by Centos Users
+[contrib]
+name=CentOS-$releasever - Contrib
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=contrib&infra=$infra
+baseurl=http://vault.centos.org/centos/$releasever/contrib/i386/
+gpgcheck=1
+enabled=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
+' > temp
+mv temp /etc/yum.repos.d/CentOS-Base.repo
+
+else
+
+if ! cat /etc/yum.repos.d/CentOS-Base.repo | grep --quiet vault; then
+	echo "change repos to vault"
+	sudo curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
+	sudo curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
+	sudo curl https://www.getpagespeed.com/files/centos6-scl-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl.repo
+	sudo curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
+fi
+
+fi
+
 file=$2
+
 if [ $(basename "$file") = "start_hbb.sh" ] ; then
 	# install yuminstall in .bashrc so it will be available in the new shell started here
 	mkdir -p /home/build
