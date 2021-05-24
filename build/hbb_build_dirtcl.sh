@@ -1,10 +1,12 @@
 #!/bin/bash
 
+tclversion=8.5.19
+
 # This script builds dirtcl using the Holy build box environment
 # options:
 # -b|-bits|--bits: 32 for 32 bits build (default 64)
-# -d|-builddir|--builddir: top directory to build in (default ~/build/tcl$arch)
-# -v|-version|--version: tcl version (default 8.5.19)
+# -d|-builddir|--builddir: top directory to build in (default ~/build/bin-$arch)
+# -v|-version|--version: tcl version (default $tclversion)
 
 # The Holy build box environment requires docker, make sure it is installed
 # e.g. on ubuntu and derivatives
@@ -25,11 +27,12 @@ source "${dir}/start_hbb.sh"
 # Parse arguments
 # ===============
 
-tclversion=8.5.19
 while [[ "$#" -gt 0 ]]; do case $1 in
 	-v|-version|--version) tclversion="$2"; shift;;
 	*) echo "Unknown parameter: $1"; exit 1;;
 esac; shift; done
+
+tclshortversion=${tclversion%.*}
 
 # Script run within Holy Build box
 # ================================
@@ -75,7 +78,7 @@ cd /build/dirtcl$tclversion-$arch
 # dirtcl tclsh in tcl source does not work in location, hack to solve
 cd /build/tcl$tclversion/unix
 mv tclsh tclsh.ori
-ln -sf ../../dirtcl$tclversion-$arch/tclsh8.5 tclsh
+ln -sf ../../dirtcl$tclversion-$arch/tclsh$tclshortversion tclsh
 
 # make links
 cd /build

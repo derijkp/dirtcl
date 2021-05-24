@@ -1,11 +1,13 @@
 #!/bin/bash
 
+tclversion=8.5.19
+
 # This script builds some packages using the Holy build box environment
 # and installs them in dirtcl
 # options:
 # -b|-bits|--bits: 32 for 32 bits build (default 64)
 # -d|-builddir|--builddir: top directory to build in (default ~/build/tcl$arch)
-# -v|-version|--version: tcl version (default 8.5.19)
+# -v|-version|--version: tcl version (default $tclversion)
 # dirtcl should be build before usong hbb_build_dirtcl.sh with the same options
 # The extensions are placed in the ext dir of the dirtcl
 
@@ -28,11 +30,12 @@ source "${dir}/start_hbb.sh"
 # Parse arguments
 # ===============
 
-tclversion=8.5.19
 while [[ "$#" -gt 0 ]]; do case $1 in
 	-v|-version|--version) tclversion="$2"; shift;;
 	*) echo "Unknown parameter: $1"; exit 1;;
 esac; shift; done
+
+tclshortversion=${tclversion%.*}
 
 # Script run within Holy Build box
 # ================================
