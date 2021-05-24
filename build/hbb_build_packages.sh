@@ -40,9 +40,12 @@ tclshortversion=${tclversion%.*}
 # Script run within Holy Build box
 # ================================
 
-# do not activate Holy Build Box environment.
-# Some do not compile with these settings (X)
-# only use HBB for glibc compat, not static libs
+# The normal Holy Build Box environment
+# will try to compile with static libs
+# As this does not work for some of the 
+# packages we want to build,
+# we do not activate Holy Build Box environment.
+# HBB is in this case only used for glibc compat, not static libs
 # source /hbb_shlib/activate
 
 # print all executed commands to the terminal
@@ -79,13 +82,13 @@ version=2.1.0
 cd /build/packages
 wget -c https://sourceforge.net/projects/extral/files/Extral-$version.src.tar.gz
 tar xvzf Extral-$version.src.tar.gz
-mv Extral Extral-$version
-rm -rf Extral-$version/Linux-i686/
+mv Extral Extral-$version || true
 cd Extral-$version
+rm -rf linux-$arch
 mkdir linux-$arch || true
 cd linux-$arch
 make distclean || true
-../configure --prefix="$dirtcldir"
+../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
 make
 rm -rf $destdir/Extral-$version
 tclsh ../build/install.tcl $destdir
@@ -97,12 +100,13 @@ version=1.1.0
 cd /build/packages
 wget -c https://sourceforge.net/projects/classytcl/files/ClassyTcl-$version-src.tar.gz
 tar xvzf ClassyTcl-$version-src.tar.gz
-mv ClassyTcl ClassyTcl-$version
+mv ClassyTcl ClassyTcl-$version || true
 cd ClassyTcl-$version
+rm -rf linux-$arch
 mkdir linux-$arch
 cd linux-$arch
 make distclean || true
-../configure --prefix="$dirtcldir"
+../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
 make
 rm -rf $destdir/Class$version
 tclsh ../build/install.tcl $destdir
@@ -115,12 +119,13 @@ version=1.1.0
 cd /build/packages
 wget -c https://sourceforge.net/projects/classytcl/files/$prog-$version-src.tar.gz
 tar xvzf $prog-$version-src.tar.gz
-mv $prog $prog-$version
+mv $prog $prog-$version || true
 cd $prog-$version
+rm -rf linux-$arch
 mkdir linux-$arch
 cd linux-$arch
 make distclean || true
-../configure --prefix="$dirtcldir"
+../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
 make
 rm -rf $destdir/$prog-$version
 tclsh ../build/install.tcl $destdir
@@ -132,7 +137,6 @@ cd /build/
 wget -c https://www.sqlite.org/2019/sqlite-autoconf-3270200.tar.gz
 tar xvzf sqlite-autoconf-3270200.tar.gz
 cd /build/sqlite-autoconf-3270200
-make distclean
 CFLAGS="-fPIC -Os -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 -DSQLITE_ENABLE_RTREE=1" \
 ./configure --enable-shared --enable-static --enable-threadsafe --enable-dynamic-extensions
 make
@@ -148,10 +152,10 @@ target=$dirtcldir/exts/$prog-$version
 cd /build/packages
 wget -c $url
 tar xvzf dbi-$version-src.tar.gz
-mv dbi dbi$version
+mv dbi dbi$version || true
 cd /build/packages/dbi$version/sqlite3
-make distclean
-./configure --prefix="$dirtcldir"
+make distclean || true
+./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
 make
 cp /io/packages/dbi_sqlite3-1.0.0-pkgIndex.tcl pkgIndex.tcl
 rm -rf $dirtcldir/exts/dbi_sqlite3-$version
@@ -166,13 +170,15 @@ cd /build/packages
 wget -c http://sourceforge.net/projects/genomecomb/files/deps/$prog-$version-src.tar.gz
 tar xvzf $prog-$version-src.tar.gz
 cd $prog
-./configure --prefix="$dirtcldir"
+./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --with-tk="$dirtcldir/lib"
 make install
+rm -rf $dirtcldir/exts/$prog$version
 mv $dirtcldir/lib/$prog$version $dirtcldir/exts
 rm -f $target/init.tcl
 cp -f /io/packages/$prog-$version-init.tcl $target/init.tcl
 rm -f $target/pkgIndex.tcl
 cp /io/packages/$prog-$version-pkgIndex.tcl $target/pkgIndex.tcl
+rm -rf "$target/linux-$arch"
 mkdir "$target/linux-$arch"
 mv "$target/lib$prog$version.so" "$target/linux-$arch"
 
@@ -180,19 +186,23 @@ mv "$target/lib$prog$version.so" "$target/linux-$arch"
 # -------
 prog=Tktable
 version=2.10
-url=http://sourceforge.net/projects/tktable/files/tktable/$version/$prog$version.tar.gz
+# url=http://sourceforge.net/projects/tktable/files/tktable/$version/$prog$version.tar.gz
+# generic sourceforge url no longer seems to work within HBB, so use direct link (to one of the mirrors)
+url=https://netcologne.dl.sourceforge.net/project/tktable/tktable/$version/$prog$version.tar.gz
 target=$dirtcldir/exts/$prog$version
 cd /build/packages
 wget -c $url
 tar xvzf $prog$version.tar.gz
 cd $prog$version
-./configure --prefix="$dirtcldir"
+./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --with-tk="$dirtcldir/lib"
 make install
+rm -rf $dirtcldir/exts/$prog$version
 mv $dirtcldir/lib/$prog$version $dirtcldir/exts
 rm -f $target/init.tcl
 cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
 rm -f $target/pkgIndex.tcl
 cp /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
+rm -rf "$target/linux-$arch"
 mkdir "$target/linux-$arch"
 mv "$target/lib$prog$version.so" "$target/linux-$arch"
 
@@ -206,17 +216,19 @@ cd /build/packages
 wget -c $url
 tar xvjf tclx$version.tar.bz2
 cd tclx$version
-./configure --prefix="$dirtcldir"
+./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
 make install
-rm -rf /build/dirtcl8.5.19-x86_64/man
+rm -rf /build/dirtcl$tclversion-x86_64/man
 rm -rf $target
 mv $dirtcldir/lib/tclx$version $target
 rm -f $target/init.tcl
 rm -f $target/pkgIndex.tcl
+rm -rf $target/lib
 mkdir $target/lib
 mv $target/*.tcl $target/lib
 cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
 cp /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
+rm -rf "$target/linux-$arch"
 mkdir "$target/linux-$arch"
 mv "$target/libtclx$version.so" "$target/linux-$arch"
 
@@ -230,15 +242,16 @@ cd /build/packages
 wget -c $url
 tar xvzf tdom_0_8_3_postrelease.tar.gz
 cd tdom-tdom_0_8_3_postrelease
-./configure --prefix="$dirtcldir"
+./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
 make install
-rm -rf /build/dirtcl8.5.19-x86_64/man
+rm -rf /build/dirtcl$tclversion-x86_64/man
 rm -rf $target
 mv $dirtcldir/lib/$prog$version $target
 rm -f $target/init.tcl
 rm -f $target/pkgIndex.tcl
 cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
 cp -f /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
+rm -rf "$target/linux-$arch"
 mkdir "$target/linux-$arch"
 mv "$target/libtdom$version.so" "$target/linux-$arch"
 rm "$target/libtdomstub$version.a"
