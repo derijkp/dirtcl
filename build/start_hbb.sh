@@ -61,16 +61,16 @@ if [ ! -f /hbb_exe/activate ]; then
 		if docker image list | grep --quiet hbb32; then
 			buildbox=hbb32
 		else
-			buildbox=phusion/holy-build-box-32:latest
+			buildbox=phusion/holy-build-box-32:2.2.0
 		fi
-		docker run -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" linux32 bash "/io/$file" "stage2" "$file" "$bits" "$uid" "$gid" ${arguments[*]}
+		docker run --net=host -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" linux32 bash "/io/$file" "stage2" "$file" "$bits" "$uid" "$gid" "$srcdir" "$builddir" ${arguments[*]}
 	else
 		if docker image list | grep --quiet hbb64; then
 			buildbox=hbb64
 		else
-			buildbox=phusion/holy-build-box-64:latest
+			buildbox=phusion/holy-build-box-64:2.2.0
 		fi
-		docker run -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" bash "/io/$file" "stage2" "$file" "$bits" "$uid" "$gid" ${arguments[*]}
+		docker run --net=host -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" bash "/io/$file" "stage2" "$file" "$bits" "$uid" "$gid" "$srcdir" "$builddir" ${arguments[*]}
 	fi
 	exit
 fi
@@ -82,10 +82,14 @@ if [ "$1" = "stage2" ] ; then
 	bits=$3
 	uid=$4
 	gid=$5
+	srcdir=$6
+	builddir=$7
 	# prepare the user build with sudo rights
 	echo "installing sudo"
 	# to stop "checksum is invalid" errors when using yum in 32 bit docker
 	if [ "$bits" = 32 ] ; then
+		rm /etc/yum.repos.d/phusion_centos-6-scl-i386.repo | true
+		yum upgrade --nogpgcheck -y
 		if ! rpm --quiet --query yum-plugin-ovl; then
 			yum install -q -y yum-plugin-ovl
 		fi
@@ -114,66 +118,6 @@ function yuminstall {
 	fi
 }
 
-# centos 6 is EOL, moved to vault: adapt the repos
-if [ "$bits" = "32" ] ; 	then
-
-cd
-echo '
-[base]
-name=CentOS-$releasever - Base
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=os&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/os/i386/
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-
-#released updates
-[updates]
-name=CentOS-$releasever - Updates
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=updates&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/updates/i386/
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-
-#additional packages that may be useful
-[extras]
-name=CentOS-$releasever - Extras
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=extras&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/extras/i386/
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-
-#additional packages that extend functionality of existing packages
-[centosplus]
-name=CentOS-$releasever - Plus
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=centosplus&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/centosplus/i386/
-gpgcheck=1
-enabled=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-
-#contrib - packages by Centos Users
-[contrib]
-name=CentOS-$releasever - Contrib
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=contrib&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/contrib/i386/
-gpgcheck=1
-enabled=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-' > temp
-mv temp /etc/yum.repos.d/CentOS-Base.repo
-
-else
-
-if ! cat /etc/yum.repos.d/CentOS-Base.repo | grep --quiet vault; then
-	echo "change repos to vault"
-	sudo curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
-	sudo curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
-	sudo curl https://www.getpagespeed.com/files/centos6-scl-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl.repo
-	sudo curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
-fi
-
-fi
-
 file=$2
 
 if [ $(basename "$file") = "start_hbb.sh" ] ; then
@@ -196,6 +140,8 @@ if [ $(basename "$file") = "start_hbb.sh" ] ; then
 	fi
 	uid=$4;
 	gid=$5;
+	srcdir=$6;
+	builddir=$7;
 	' >> /home/build/.bashrc
 	# if run as start_hbb.sh directly, show a shell
 	echo "shell sstarted by start_hbb.sh"
@@ -215,6 +161,8 @@ else
 fi
 uid=$4;
 gid=$5;
-shift 5;
+srcdir=$6;
+builddir=$7;
+shift 7;
 
 echo "Entering Holy Build Box environment; building using $bits bits, uid=$uid, gid=$gid"
