@@ -144,13 +144,16 @@ systems) on linux is to run the build/hbb_build_dirtcl.sh script. It will
 use the Holy Build Box (Holy Build Box uses docker, so access to docker is
 needed) to build a distributable portable application directory. 
 
-For making the 64 bit version, use:
+For making the 64 bit Linux version, use:
 ./build/hbb_build_dirtcl.sh
-This wil install it by default in the directory ~/build/bin-x86_64/dirtcl$version-x86_64
+This wil install it by default in the directory ~/build/bin-x86_64/dirtcl$version-linux-x86_64
 You can change the build directory (~/build/bin-x86_64) using the --builddir option. 
 
-For the 32 bit version (installed by default in ~/build/bin-ix86/dirtcl$version-ix86), use:
-./build/hbb_build_dirtcl.sh -b 32
+For the 32 bit version (installed by default in ~/build/bin-ix86/dirtcl$version-linux-ix86), use:
+./build/hbb_build_dirtcl.sh -arch ix86
+
+The windows version (64 bit) can be (cross)compiled on linux using hbb with the following command:
+./build/hbb_build_dirtcl.sh -arch win
 
 The script build/hbb_build_packages.sh can be used to compile and install several
 packages in the dirtcl built earlier.
@@ -169,9 +172,9 @@ cd dirtcl
 
 You can give several options:
  --enable-threads or --disable-threads : create a thread enabled version of Tcl or not
- --version : use to compile a different version of Tcl (The patching 
-             happens intelligently, but large changes between versions 
-             are not necesarily coped with)
+ --version : use to compile a different version of Tcl, e.g. --version 8.6.12 to 
+             create a Tcl 8.6 dirtcl (The patching happens intelligently,
+             but large changes between versions are not necesarily coped with),
  --host and --build: for crosscompiling
 
 Bugs

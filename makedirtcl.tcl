@@ -2,8 +2,11 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
+set tclversion 8.6.12
 set tclversion 8.5.19
-set threaded 0
+set threaded 1
+set os $tcl_platform(os)
+set platform $tcl_platform(platform)
 
 set configureopts {}
 while 1 {
@@ -22,6 +25,19 @@ while 1 {
 			set tclversion [lindex $argv 1]
 			set argv [lrange $argv 2 end]
 		}
+		{^--os$} {
+			set os [lindex $argv 1]
+			set argv [lrange $argv 2 end]
+			if {$os eq "Linux"} {
+				set platform unix
+			} elseif {$os eq "Windows"} {
+				set platform Windows
+			} elseif {$os eq "crosswin"} {
+				set platform $os
+			} else {
+				error "--os must be one of Linux, Windows or crosswin"
+			}
+		}
 		default break
 	}
 }
@@ -29,9 +45,8 @@ while 1 {
 set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
 
 if {[lsearch $argv crosswin] != -1} {
+	set os Windows
 	set platform crosswin
-} else {
-	set platform $tcl_platform(platform)
 }
 puts "platform: $platform"
 set basetcldir [file normalize ../tcl$tclversion]
@@ -114,6 +129,18 @@ proc rewrite_after {args} {
 	error "\"$args\" not found"
 }
 
+proc rewrite_replace {c args} {
+	foreach {from to} $args {
+		while 1 {
+			set pos [string first $from $c]
+			if {$pos == -1} break
+			set endpos [expr {$pos + [string length $from]}]
+			set c [string range $c 0 [expr {$pos-1}]]$to[string range $c $endpos end]
+		}
+	}
+	return $c
+}
+
 proc outexec {args} {
 	global platform
 	if {$platform eq "unix"} {
@@ -192,6 +219,9 @@ set c [rewrite_before "return TCL_OK" $c {
     }
 #endif /* DIRTCL */
     }]
+#if {$tclshortversion eq "8.6"} {
+#	regsub TclSetStartupScriptFileName $c \(tclIntStubsPtr->tclSetStartupScriptFileName\) c
+#}
 file_write $file $c
 }
 
@@ -222,6 +252,9 @@ set c [rewrite_after {appName = path;} $c {
 }]
 
 }
+if {$tclshortversion eq "8.6"} {
+	regsub TclSetStartupScriptFileName $c \(tclIntStubsPtr->tclSetStartupScriptFileName\) c
+}
 file_write $file $c
 
 # convert winMain.c
@@ -232,14 +265,24 @@ if {![file exists $file.orig]} {
 	file copy $file $file.orig
 }
 set c [file_read $file.orig]
-set c [rewrite_before "#include \"tkInt.h\"" $c "#define DIRTCL 1\n"]
+if {[regexp tkInt.h $c]} {
+	set c [rewrite_before "#include \"tkInt.h\"" $c "#define DIRTCL 1\n"]
+} else {
+	set c [rewrite_before "#include \"tk.h\"" $c "#define DIRTCL 1\n"]
+}
 set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
-set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c {
+set extracode {
 #ifdef DIRTCL
     Tcl_Obj *temp;
     TclSetPreInitScript(preInitCmd);
 #endif /* DIRTCL */
-    }]
+    }
+if {[catch {
+	set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" $c $extracode]
+}]} {
+	set c [rewrite_before "if ((Tcl_Init)(interp) == TCL_ERROR)" $c $extracode]
+}
+
 set c [rewrite_after {Tcl_SetVar(interp, "tcl_rcFileName", "~/wishrc.tcl", TCL_GLOBAL_ONLY);} $c {
 #ifdef DIRTCL
 if (Tcl_Eval(interp, initScript) == TCL_ERROR) {
@@ -252,11 +295,15 @@ if (temp != NULL) {
 }
 #endif /* DIRTCL */
 }]
+
 set c [rewrite_after {"set tcl_libPath [list $tcl_library $tcl_root]\n"} $c {
 	"set tk_library [file join $tcl_root tk$tcl_version]\n"
 }]
-file_write $file $c
 
+if {$tclshortversion eq "8.6"} {
+	regsub TclSetStartupScriptFileName $c \(tclIntStubsPtr->tclSetStartupScriptFileName\) c
+}
+file_write $file $c
 
 # compile Tcl
 # -----------------------
@@ -272,10 +319,10 @@ if {$threaded == -1} {
 puts platform=$platform
 if {$platform eq "crosswin"} {
 	lappend configureopts [list --host=$env(HOST)] {--build=i686-unknown-linux-gnu}
-	file mkdir -force $tcldir/lib/tcl8.5
+	file mkdir -force $tcldir/lib/tcl$tclshortversion
 	file copy -force $scriptdir/localbuildboot.tcl $tcldir/lib/boot.tcl
-	file copy -force $scriptdir/extension.tcl $tcldir/lib/tcl8.5/
-	file copy -force $tcldir/../library/tm.tcl $tcldir/lib/tcl8.5/
+	file copy -force $scriptdir/extension.tcl $tcldir/lib/tcl$tclshortversion/
+	file copy -force $tcldir/../library/tm.tcl $tcldir/lib/tcl$tclshortversion/
 }
 if {[lsearch $argv noreconfig] == -1} {
 	catch {outexec make distclean}
@@ -288,17 +335,25 @@ if {[lsearch $argv noreconfig] == -1} {
 		error $errormsg
 	}
 }
-catch {outexec make} e
+set error [catch {outexec make} e]
 puts $e
 catch {
 	file mkdir lib/tcl$tclshortversion
 } e
 puts $e
 catch {
-	file copy ../library/init.tcl lib/tcl$tclshortversion
+	file copy -force ../library/init.tcl lib/tcl$tclshortversion
 } e
 puts $e
-catch {outexec make install} e
+
+# convert Makefile
+puts "converting Tcl Makefile"
+catch {file copy Makefile Makefile.ori}
+set c [file_read Makefile]
+set c [rewrite_replace $c {./$(TCLSH) "$(ROOT_DIR)/tools/installData.tcl"} {$(TCL_EXE) "$(ROOT_DIR)/tools/installData.tcl"}]
+file_write Makefile $c
+
+set error [catch {outexec make install} e]
 puts $e
 
 # compile Tk
@@ -313,9 +368,9 @@ if {[lsearch $argv noreconfig] == -1} {
 	} errormsg]
 	puts $errormsg
 }
-catch {outexec make} e
+set error [catch {outexec make} e]
 puts $e
-catch {outexec make install} e
+set error [catch {outexec make install} e]
 puts $e
 
 # Convert to dirtcl
@@ -368,7 +423,6 @@ file copy [lindex [glob $scriptdir/packages/pkgtools*] 0] $dirtcldir/exts
 if {$platform eq "windows"} {
 	file copy -force $tkdir/rc/wish.ico $dirtcldir/lib
 }
-
 
 # setup example
 # -------------

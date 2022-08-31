@@ -4,7 +4,8 @@ tclversion=8.5.19
 
 # This script builds dirtcl using the Holy build box environment
 # options:
-# -b|-bits|--bits: 32 for 32 bits build (default 64)
+# -a|-arch|--arch: 64, x86_64 or linux-x86_64 for 64 bit Linux build (default); ix86, 32 or linux-ix86 for 32 bits Linux build; win, windows-x86_64 or mingw-w64 for Windows 64 bit build
+# -b|-bits|--bits: select 32 or 64 bits Linux build (default 64 = same as -arch x86_64)
 # -d|-builddir|--builddir: top directory to build in (default ~/build/bin-$arch)
 # -v|-version|--version: tcl version (default $tclversion)
 
@@ -48,10 +49,22 @@ set -x
 # set up environment
 # ------------------
 
+if [[ $arch =~ "linux" ]]; then
+	yuminstall devtoolset-9
+	## use source instead of scl enable so it can run in a script
+	## scl enable devtoolset-9 bash
+	source /opt/rh/devtoolset-9/enable
+
+	# X libraries are needed to make Tk
+	yuminstall libX11-devel
+
+	os="Linux"
+else
+	os="Windows"
+fi
+
 # makedirtcl needs tcl to run
-# X libraries are needed to make Tk
 yuminstall tcl
-yuminstall libX11-devel
 yuminstall wget
 
 # Build
@@ -61,10 +74,10 @@ cd /build
 # get tcl and tk
 cd /build
 if [ ! -f tcl$tclversion-src.tar.gz ] ; then
-	wget -c --tries=40 --max-redirect=40 http://prdownloads.sourceforge.net/tcl/tcl$tclversion-src.tar.gz
+    wget -c --tries=40 --max-redirect=40 http://prdownloads.sourceforge.net/tcl/tcl$tclversion-src.tar.gz
 fi
 if [ ! -f tk$tclversion-src.tar.gz ] ; then
-	wget -c --tries=40 --max-redirect=40 http://prdownloads.sourceforge.net/tcl/tk$tclversion-src.tar.gz
+    wget -c --tries=40 --max-redirect=40 http://prdownloads.sourceforge.net/tcl/tk$tclversion-src.tar.gz
 fi
 tar xvzf tcl$tclversion-src.tar.gz
 tar xvzf tk$tclversion-src.tar.gz
@@ -73,12 +86,17 @@ tar xvzf tk$tclversion-src.tar.gz
 rm -rf /build/dirtcl$tclversion-$arch
 mkdir /build/dirtcl$tclversion-$arch
 cd /build/dirtcl$tclversion-$arch
-/io/makedirtcl.tcl --version $tclversion
+if [ "$os" == "Windows" ] ; then
+	dirtcl_os='crosswin'
+else
+	dirtcl_os="$os"
+fi
+/io/makedirtcl.tcl --version $tclversion --os $dirtcl_os
 
 # dirtcl tclsh in tcl source does not work in location, hack to solve
 cd /build/tcl$tclversion/unix
-mv tclsh tclsh.ori
-ln -sf ../../dirtcl$tclversion-$arch/tclsh$tclshortversion tclsh
+mv tclsh tclsh.ori || true
+ln -sf ../../dirtcl$tclversion-$arch/tclsh$tclshortversion tclsh || true
 
 # make links
 cd /build
