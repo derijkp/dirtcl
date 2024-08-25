@@ -1,6 +1,6 @@
 #!/bin/bash
 
-tclversion=8.5.19
+tclversion=8.6.14
 
 # This script builds dirtcl using the Holy build box environment
 # options:
@@ -68,6 +68,7 @@ fi
 # makedirtcl needs tcl to run
 yuminstall tcl
 yuminstall wget
+yuminstall zlib-static
 
 # Build
 # -----

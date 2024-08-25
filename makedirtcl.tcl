@@ -2,8 +2,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.6.12
-set tclversion 8.5.19
+set tclversion 8.6.14
 set threaded 1
 set os $tcl_platform(os)
 set platform $tcl_platform(platform)
@@ -57,7 +56,7 @@ if {$platform eq "unix"} {
 	set tcldir [file normalize ../tcl$tclversion/unix]
 	set tkdir [file normalize ../tk$tclversion/unix]
 	set sh sh
-	set sharedopt --disable-shared
+	set sharedopt {--disable-shared --enable-static}
 	set ext ""
 } elseif {$platform eq "windows"} {
 	set tcldir [file normalize ../tcl$tclversion/win]
@@ -201,6 +200,7 @@ set c [rewrite_before "#include \"tcl.h\"" $c {#define DIRTCL 1
 #include "tclInt.h"
 }]
 set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
+
 set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" "if ((Tcl_Init)(interp) == TCL_ERROR)" $c {
 #ifdef DIRTCL
     Tcl_Obj *temp;
@@ -219,9 +219,12 @@ set c [rewrite_before "return TCL_OK" $c {
     }
 #endif /* DIRTCL */
     }]
-#if {$tclshortversion eq "8.6"} {
-#	regsub TclSetStartupScriptFileName $c \(tclIntStubsPtr->tclSetStartupScriptFileName\) c
-#}
+
+if {$tclshortversion eq "8.6"} {
+	set c [rewrite_replace $c {TclSetStartupScriptFileName(Tcl_GetStringFromObj(temp,NULL));} \
+		{Tcl_SetStartupScript(temp, (const char *)NULL);}]
+}
+
 file_write $file $c
 }
 
@@ -252,9 +255,9 @@ set c [rewrite_after {appName = path;} $c {
 }]
 
 }
-if {$tclshortversion eq "8.6"} {
-	regsub TclSetStartupScriptFileName $c \(tclIntStubsPtr->tclSetStartupScriptFileName\) c
-}
+#if {$tclshortversion eq "8.6"} {
+#	regsub TclSetStartupScriptFileName $c \(tclIntStubsPtr->tclSetStartupScriptFileName\) c
+#}
 file_write $file $c
 
 # convert winMain.c
@@ -283,7 +286,12 @@ if {[catch {
 	set c [rewrite_before "if ((Tcl_Init)(interp) == TCL_ERROR)" $c $extracode]
 }
 
-set c [rewrite_after {Tcl_SetVar(interp, "tcl_rcFileName", "~/wishrc.tcl", TCL_GLOBAL_ONLY);} $c {
+set anchor {Tcl_SetVar(interp, "tcl_rcFileName", "~/wishrc.tcl", TCL_GLOBAL_ONLY);}
+if {[string first $anchor $c] == -1} {
+	set anchor {Tcl_ObjSetVar2(interp, Tcl_NewStringObj("tcl_rcFileName", -1), NULL,
+	    Tcl_NewStringObj("~/wishrc.tcl", -1), TCL_GLOBAL_ONLY);}
+}
+set c [rewrite_after $anchor $c {
 #ifdef DIRTCL
 if (Tcl_Eval(interp, initScript) == TCL_ERROR) {
 	return (TCL_ERROR);
@@ -301,8 +309,10 @@ set c [rewrite_after {"set tcl_libPath [list $tcl_library $tcl_root]\n"} $c {
 }]
 
 if {$tclshortversion eq "8.6"} {
-	regsub TclSetStartupScriptFileName $c \(tclIntStubsPtr->tclSetStartupScriptFileName\) c
+	set c [rewrite_replace $c {TclSetStartupScriptFileName(Tcl_GetStringFromObj(temp,NULL));} \
+		{Tcl_SetStartupScript(temp, (const char *)NULL);}]
 }
+
 file_write $file $c
 
 # compile Tcl
@@ -337,6 +347,15 @@ if {[lsearch $argv noreconfig] == -1} {
 }
 set error [catch {outexec make} e]
 puts $e
+if {$platform eq "unix" && $tclshortversion eq "8.6"} {
+	# for some reason the option to build static did not work here, 
+	# take a shortcut (not digging into configure to solve) and compile static tclsh manually
+	exec gcc -O2  -pipe    -Wl,--export-dynamic  tclAppInit.o \
+	        -Wl,-Bstatic -L/build/tcl8.6.14/unix -ltcl8.6 libtclstub8.6.a -lz -Wl,-Bdynamic -ldl  -lpthread -lm  \
+	        "-Wl,-rpath,/build/dirtcl8.6.14-linux-x86_64/lib" -o tclsh
+
+}
+
 catch {
 	file mkdir lib/tcl$tclshortversion
 } e
@@ -424,6 +443,17 @@ if {$platform eq "windows"} {
 	file copy -force $tkdir/rc/wish.ico $dirtcldir/lib
 }
 
+if {$platform eq "crosswin"} {
+	# crosswin compiled works like unix in the respect that we can start Tclsh and use "package require Tk"
+	# (and the compiled wish gave errors)
+	# This does require the tk dll being available in <appdir>/bin
+	file mkdir $dirtcldir/bin
+	foreach dll [glob $dirtcldir/tk*.dll] {
+		file copy $dll $dirtcldir/bin/[file tail $dll]
+	}
+	# wish is here just a copy of tclsh (not a separately compiled exe)
+	file copy -force [lindex [glob $dirtcldir/tclsh*] 0] [lindex [glob $dirtcldir/wish*] 0]
+}
 # setup example
 # -------------
 puts "setup example"
@@ -456,6 +486,8 @@ if {$platform eq "unix"} {
 	cd $dirtcldir
 	exec ln -s [lindex [glob tclsh8*] 0] tkexample$ext
 	cd $keeppwd
+} elseif {$platform eq "crosswin"} {
+	file copy -force [lindex [glob $dirtcldir/tclsh*] 0] $dirtcldir/tkexample$ext
 } else {
 	file copy -force [lindex [glob $dirtcldir/wish*] 0] $dirtcldir/tkexample$ext
 }
@@ -476,6 +508,8 @@ if {$platform eq "unix"} {
 	cd $dirtcldir
 	exec ln -s [lindex [glob tclsh8*] 0] demos$ext
 	cd $keeppwd
+} elseif {$platform eq "crosswin"} {
+	file copy -force [lindex [glob $dirtcldir/tclsh*] 0] $dirtcldir/demos$ext
 } else {
 	file copy -force [lindex [glob $dirtcldir/wish*] 0] $dirtcldir/demos$ext
 }
