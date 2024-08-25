@@ -38,16 +38,16 @@ proc ::pkgtools::findlib {dir name} {
 		if {[file exists $libfile]} {return $libfile}
 	}
 	if {([string equal $tcl_platform(platform) unix] || [string equal $tcl_platform(platform) windows])
-	    && ([regexp {^i|x.*86} $tcl_platform(machine)] || "$tcl_platform(machine)" == "intel")} {
+	    && ([regexp {^i|x.*86} $tcl_platform(machine)] || "$tcl_platform(machine)" == "intel" || "$tcl_platform(machine)" == "amd64")} {
 		if {[string equal $tcl_platform(platform) windows]} {
 			set oss {Windows windows win win32}
 		} else {
 			set oss [list $tcl_platform(os) [string tolower $tcl_platform(os)]]
 		}
-		if {$tcl_platform(wordSize) == 4} {
-			set order {i*86 x86* intel}
-		} else {
+		if {$tcl_platform(wordSize) == 8 || ([info exists tcl_platform(pointerSize)] &&  $tcl_platform(pointerSize) == 8)} {
 			set order {x86* i*86 intel}
+		} else {
+			set order {i*86 x86* intel}
 		}
 		foreach os $oss {
 			foreach arch $order {

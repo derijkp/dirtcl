@@ -60,8 +60,8 @@ by name of the directory in stead of using a pkgIndex.tcl. They must contain a f
 will be used to initiate the package upon a package require
 
 
-Portable binaries
------------------
+Making Portable binaries
+------------------------
 You can add external or your own extra binaries by e.g. making a directory bin in the appdir
 and placing them there. Then use 
 ```
@@ -91,8 +91,8 @@ You can test/debug the build process interactively by starting a shell in the bu
 ./build/start_hbb.sh
 ```
 
-The build scripts support following options
-* -b: use -b 32 for building 32 bit binaries, or -b 64 (default) for 64 bit binaries
+The build scripts supports following options
+* -arch: use -b ix86 for building 32 bit Linux binaries, or -b x86_64 (default) for 64 bit Linux binaries, or -arch win for Windows (64 bit) binaries
 * -builddir: can be used to specify another (top) build directory than default (~/build/tcl$arch)
 
 If some libraries cannot be statically compiled into the binaries, you can
@@ -119,18 +119,22 @@ managers, distributions is an enormous amount of work, and then you still
 cannot support everything (using dirtcl you, easily, make one package that
 will work on all systems)
 * The user often still ends up in dependency hell (because packages are
-not made for their specific version of their specific distribution, or not tested on it)
+not made for their specific version of their specific distribution, and/or not tested on it)
 * The user requires root access
 
 Versus docker
-* Users would have to install docker and learn how to use docker; They might even
-not be able to do this, as it requires root.
+* docker requires root access, which a user might even not have
+* Users would have to install docker and learn how to use docker
 * you would have to learn how to use docker.
 * docker images will be a lot bigger, as they include entire Linux
 distributions
 
 building dirtcl
 ===============
+You do not have to build dirtcl yourself to create dirtcl based applications,
+as you can just take a binary distribution and adapt from that.
+Follow below instructions if you do want to build a dirtcl from scratch yourself:
+
 makedirtcl.tcl will make a selfcontained Tcl/Tk distribution (dirtcl), that 
 can be used to create a Tcl/Tk based application directory.
 It will compile a customized version of Tcl and Tk, that can exist next to 

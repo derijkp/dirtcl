@@ -2,9 +2,6 @@
 set -e
 
 echo "install-deps.sh"
-
-# centos 6 is EOL, moved to vault: (hbb v2.2.0 already solves this)
-
 yum install -y libX11-devel wget sudo
 yum install -y git gcc-c++
 yum install -y centos-release-scl
@@ -13,10 +10,4 @@ yum install -y devtoolset-8
 # you can now use
 # scl enable devtoolset-8 bash
 # to develop with a newer toolset
-yum install -y devtoolset-9
-# you can now use
-# scl enable devtoolset-9 bash
-# to develop with a newer toolset
-yum install -y wine mingw64-gcc mingw64-zlib mingw64-zlib-static
-
 echo "done"

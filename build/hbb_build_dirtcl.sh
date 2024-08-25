@@ -49,12 +49,14 @@ set -x
 # set up environment
 # ------------------
 
-if [[ $arch =~ "linux" ]]; then
+if [ $arch = "linux-x86_64" ] || [ $arch = "windows-x86_64" ]; then
 	yuminstall devtoolset-9
 	## use source instead of scl enable so it can run in a script
 	## scl enable devtoolset-9 bash
 	source /opt/rh/devtoolset-9/enable
+fi
 
+if [[ $arch =~ "linux" ]]; then
 	# X libraries are needed to make Tk
 	yuminstall libX11-devel
 

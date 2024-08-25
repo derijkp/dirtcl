@@ -50,16 +50,23 @@ if [ ! -f /hbb_exe/activate ]; then
 		arch=linux-ix86
 	elif [ "$arch" = "64" ] || [ "$arch" = "x86_64" ]; then
 		arch=linux-x86_64
-	elif [ "$arch" = "win" ] || [ "$arch" = "mingw-w64" ]; then
+	elif [ "$arch" = "win-ix86" ] || [ "$arch" = "mingw-w32" ]; then
+		arch=windows-ix86
+	elif [ "$arch" = "win" ] || [ "$arch" = "windows" ] || [ "$arch" = "win-x86_64" ] || [ "$arch" = "mingw-w64" ]; then
 		arch=windows-x86_64
 	fi
 	if [ "$builddir" = "" ] ; then
-		if [ "$arch" = "linux-ix86" ] ; 	then
+		if [ "$arch" = "linux-x86_64" ] ; 	then
+			builddir="$HOME/build/bin-x86_64"
+		elif [ "$arch" = "linux-ix86" ] ; 	then
 			builddir="$HOME/build/bin-ix86"
 		elif [ "$arch" = "windows-x86_64" ] ; 	then
 			builddir="$HOME/build/bin-windows-x86_64"
+		elif [ "$arch" = "windows-ix86" ] ; 	then
+			builddir="$HOME/build/bin-windows-ix86"
 		else
-			builddir="$HOME/build/bin-x86_64"
+			echo "unknown arch $arch"
+			exit 1
 		fi
 	fi
 	mkdir -p "$builddir"
@@ -71,15 +78,15 @@ if [ ! -f /hbb_exe/activate ]; then
 	gid=$(id -g $uid)
 	
 	if [ "$arch" = "linux-ix86" ] ; 	then
-		if docker image list | grep --quiet hbb32; then
-			buildbox=hbb32
+		if docker image list | grep --quiet 'hbb32.*2.2.0'; then
+			buildbox=hbb32:2.2.0
 		else
 			buildbox=phusion/holy-build-box-32:2.2.0
 		fi
 		docker run --net=host -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" linux32 bash "/io/$file" "stage2" "$file" "$arch" "$uid" "$gid" "$srcdir" "$builddir" ${arguments[*]}
 	else
-		if docker image list | grep --quiet hbb64; then
-			buildbox=hbb64
+		if docker image list | grep --quiet 'hbb64.*2.2.0'; then
+			buildbox=hbb64:2.2.0
 		else
 			buildbox=phusion/holy-build-box-64:2.2.0
 		fi
@@ -101,6 +108,10 @@ if [ "$1" = "stage2" ] ; then
 	echo "installing sudo ($arch)"
 	# to stop "checksum is invalid" errors when using yum in 32 bit docker
 	if [ "$arch" = linux-ix86 ] ; then
+		rm -f /etc/yum.repos.d/phusion_centos-6-scl-i386.repo
+		echo "change repos to vault"
+		curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
+		curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
 		if ! rpm --quiet --query yum-plugin-ovl; then
 			yum install -q -y yum-plugin-ovl
 		fi
@@ -132,50 +143,13 @@ function yuminstall {
 # centos 6 is EOL, moved to vault: adapt the repos
 if [ "$arch" = "linux-ix86" ] ; 	then
 
-cd
-echo '
-[base]
-name=CentOS-$releasever - Base
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=os&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/os/i386/
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
+rm -f /etc/yum.repos.d/phusion_centos-6-scl-i386.repo
+if ! cat /etc/yum.repos.d/CentOS-Base.repo | grep --quiet vault; then
+	echo "change repos to vault"
+	curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
+	curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
+fi
 
-#released updates
-[updates]
-name=CentOS-$releasever - Updates
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=updates&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/updates/i386/
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-
-#additional packages that may be useful
-[extras]
-name=CentOS-$releasever - Extras
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=extras&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/extras/i386/
-gpgcheck=1
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-
-#additional packages that extend functionality of existing packages
-[centosplus]
-name=CentOS-$releasever - Plus
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=centosplus&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/centosplus/i386/
-gpgcheck=1
-enabled=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-
-#contrib - packages by Centos Users
-[contrib]
-name=CentOS-$releasever - Contrib
-#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=i386&repo=contrib&infra=$infra
-baseurl=http://vault.centos.org/centos/$releasever/contrib/i386/
-gpgcheck=1
-enabled=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
-' > temp
-sudo mv -f temp /etc/yum.repos.d/CentOS-Base.repo
 
 else
 
@@ -208,6 +182,31 @@ echo 'if [ "$arch" = 'linux-ix86' ] ; then
 	ARCH='-linux-ix86'
 	arch=linux-ix86
 	bits=32
+elif [ "$arch" = 'windows-ix86' ] ; then
+	ARCH='-windows-ix86'
+	arch=windows-ix86
+	bits=64
+	sudo yum install -y mingw64-gcc mingw64-zlib mingw64-zlib-static
+	sudo yum install -y mingw32-gcc mingw32-zlib mingw32-zlib-static
+	# sudo yum install -y mingw64-g++ mingw64-libgnurx-static mingw64-boost mingw64-boost-static
+	export CROSSTARGET="w64-mingw32"
+	export TARGETARCHITECTURE="i686"
+	#
+	export TARGET="$TARGETARCHITECTURE-$CROSSTARGET"
+	export HOST="$TARGET"
+	export CROSSBASE="/usr/lib/gcc/$TARGET/4.9.2/"
+	# export BASE=/build/deps-$TARGET
+	export LDFLAGS="-L$CROSSBASE"
+	export CPPFLAGS="-I$CROSSBASE/include"
+	export CFLAGS="-I$CROSSBASE/include"
+	export CROSS_COMPILE="$TARGET-"
+	#export CC=${CROSS_COMPILE}gcc
+	#export CXX=${CROSS_COMPILE}g++
+	#export CPP=${CROSS_COMPILE}cpp
+	#export AR=${CROSS_COMPILE}ar
+	#export LD=${CROSS_COMPILE}ld
+	#export RANLIB=${CROSS_COMPILE}ranlib
+	export DIRTCL=/build/dirtcl-$TARGET
 elif [ "$arch" = 'windows-x86_64' ] ; then
 	ARCH='-windows-x86_64'
 	arch=windows-x86_64
