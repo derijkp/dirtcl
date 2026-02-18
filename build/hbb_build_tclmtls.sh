@@ -1,6 +1,7 @@
 #!/bin/bash
 
-tclversion=8.5.19
+tclversion=8.6.14
+tclmtlsversion=1.1.0
 
 # This script builds some packages using the Holy build box environment
 # and installs them in dirtcl
@@ -19,6 +20,9 @@ tclversion=8.5.19
 
 # stop on error
 set -e
+
+# print all executed commands to the terminal
+set -x
 
 # Prepare and start docker with Holy Build box
 # ============================================
@@ -48,15 +52,18 @@ tclshortversion=${tclversion%.*}
 # HBB is in this case only used for glibc compat, not static libs
 # source /hbb_shlib/activate
 
-# print all executed commands to the terminal
-set -x
-
 # set up environment
 # ------------------
 
 # X libraries are needed to make Tk, wget to download from sourceforge
 yuminstall wget
-# yuminstall openssl-devel
+#yuminstall gcc-c++
+#yuminstall centos-release-scl
+#sudo yum upgrade -y
+## sudo yum list all | grep devtoolset
+yuminstall devtoolset-9
+## use source instead of scl enable so it can run in a script
+source /opt/rh/devtoolset-9/enable
 
 # locations
 tcldir=/build/tcl$tclversion
@@ -76,48 +83,57 @@ PATH=/build/bin:$PATH
 mkdir /build/packages || true
 cd /build/packages
 
-# source /hbb_exe/activate
-
-
-# openssl
+# tclmtls
 # -------
-cd /build
-wget --no-check-certificate  https://www.openssl.org/source/openssl-1.1.1l.tar.gz
-tar xvzf openssl-1.1.1l.tar.gz
-cd /build/openssl-1.1.1l
-make clean || true
-make distclean || true
-./config -enable-static no-threads
-# --prefix=/usr/local/openssl --openssldir=/usr/local/openssl
-make CFLAGS="-fPIC"
-sudo make install
-#sudo rm /usr/local/lib64/libssl.so* /usr/local/lib64/libcrypto.so*
 
-# tcltls
-# ------
-prog=tcltls
-finalprog=tls
-version=1.7.22
+prog=tclmtls
+finalprog=mtls
+version=$tclmtlsversion
+tlsdownload=tclmtls-$version
+tlsdir=tclmtls-$version
+
+yuminstall git
+
 target=$dirtcldir/exts/$prog$version
-finaltarget=$dirtcldir/exts/$finalprog$version
+finaltarget=$dirtcldir/exts/mtls-$tclmtlsversion
 cd /build/packages
-wget -c https://core.tcl-lang.org/tcltls/uv/$prog-$version.tar.gz
-tar xvzf $prog-$version.tar.gz
-cd /build/packages/$prog-$version
-make distclean
-# edited to remove openssl test (which fails, but compilation works)
-cp /io/build/configure.tcltls.edited configure
-./configure --enable-static-ssl --with-openssl-dir=/usr/local/lib64/ --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
+rm -rf tclmtls || true
+git clone https://github.com/chpock/tclmtls.git
+cd tclmtls
+git checkout v1.1.0
+git submodule update --init --recursive
+
+mkdir build && cd build
+../configure --prefix="$dirtcldir"
 make
 make install
-rm -rf $finaltarget
-mv $dirtcldir/lib/$prog$version $finaltarget
-rm -f $finaltarget/init.tcl
-cp -f /io/packages/$prog-$version-init.tcl $finaltarget/init.tcl
-mkdir $finaltarget/lib
-cp -f /io/packages/$prog-$version-lib_init.tcl $finaltarget/lib/init.tcl
-rm -rf "$finaltarget/linux-$arch"
-mkdir "$finaltarget/linux-$arch"
-mv "$finaltarget/$prog.so" "$finaltarget/linux-$arch/libtls$version.so"
 
-echo "Finished building package"
+rm -rf $finaltarget || true
+# mkdir $finaltarget
+
+mv $dirtcldir/lib/mtls$tclmtlsversion $finaltarget
+
+rm -rf "$finaltarget/$arch"
+mkdir "$finaltarget/$arch"
+cp -al "$finaltarget/libmtls$tclmtlsversion.so" "$finaltarget/$arch/libmtls$tclmtlsversion.so"
+
+rm -f $finaltarget/init.tcl
+echo 'package require pkgtools
+if {[package vsatisfies [package provide Tcl] 9.0-]} {
+	load [file join $dir [pkgtools::architecture] libtcl9mtls1.1.0.so] [string totitle mtls]
+} else {
+	load [file join $dir [pkgtools::architecture] libmtls1.1.0.so] [string totitle mtls]
+}
+' > $finaltarget/init.tcl
+
+echo 'package require pkgtools
+if {[package vsatisfies [package provide Tcl] 9.0-]} {
+    package ifneeded mtls 1.1.0 \
+	[list load [file join $dir [pkgtools::architecture] libtcl9mtls1.1.0.so] [string totitle mtls]]
+} else {
+    package ifneeded mtls 1.1.0 \
+	[list load [file join $dir [pkgtools::architecture] libmtls1.1.0.so] [string totitle mtls]]
+}
+' > $finaltarget/pkgIndex.tcl
+
+echo "Finished building package $name in $finaltarget"

@@ -37,11 +37,13 @@ if [ ! -f /hbb_exe/activate ]; then
 	echo "Running script $dir/$file"
 	builddir=""
 	arch=linux-x86_64
-	argumentspos=1; 
+	argumentspos=1;
+	clear=1
 	while [[ "$#" -gt 0 ]]; do case $1 in
 		-b|-bits|--bits) arch="$2"; shift;;
 		-a|-arch|--arch) arch="$2"; shift;;
 		-d|-builddir|--builddir) builddir="$(readlink -f "$2")" ; shift;;
+		-c|-clear|--clear) clear="$2"; shift;;
 		*) arguments[$argumentspos]="$1"; argumentspos+=1 ; arguments[$argumentspos]="$2"; argumentspos+=1 ; shift;;
 	esac; shift; done
 	if [ "$bits" = "32" ] ; then arch=linux-ix86 ; fi
@@ -73,24 +75,25 @@ if [ ! -f /hbb_exe/activate ]; then
 	echo "Build $arch version"
 	echo "builddir=$builddir"
 	echo "srcdir=$srcdir"
+	echo "clear=$clear"
 	# run the script in holy build box
 	uid=$(id -u)
 	gid=$(id -g $uid)
 	
 	if [ "$arch" = "linux-ix86" ] ; 	then
-		if docker image list | grep --quiet 'hbb32.*2.2.0'; then
-			buildbox=hbb32:2.2.0
+		if docker image list | grep --quiet 'hbb32.*3.0.2'; then
+			buildbox=hbb32:3.0.2
 		else
-			buildbox=phusion/holy-build-box-32:2.2.0
+			buildbox=phusion/holy-build-box-32:3.0.2
 		fi
-		docker run --net=host -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" linux32 bash "/io/$file" "stage2" "$file" "$arch" "$uid" "$gid" "$srcdir" "$builddir" ${arguments[*]}
+		docker run --net=host -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" linux32 bash "/io/$file" "stage2" "$file" "$arch" "$uid" "$gid" "$srcdir" "$builddir" "$clear" ${arguments[*]}
 	else
-		if docker image list | grep --quiet 'hbb64.*2.2.0'; then
-			buildbox=hbb64:2.2.0
+		if docker image list | grep --quiet 'hbb64.*3.0.2'; then
+			buildbox=hbb64:3.0.2
 		else
-			buildbox=phusion/holy-build-box-64:2.2.0
+			buildbox=phusion/holy-build-box-64:3.0.2
 		fi
-		docker run --net=host -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" bash "/io/$file" "stage2" "$file" "$arch" "$uid" "$gid" "$srcdir" "$builddir" ${arguments[*]}
+		docker run --net=host -t -i --rm -v "$srcdir:/io" -v "$builddir:/build" "$buildbox" bash "/io/$file" "stage2" "$file" "$arch" "$uid" "$gid" "$srcdir" "$builddir" "$clear" ${arguments[*]}
 	fi
 	exit
 fi
@@ -104,18 +107,17 @@ if [ "$1" = "stage2" ] ; then
 	gid=$5
 	srcdir=$6
 	builddir=$7
+	clear=$8
+	# centos7 is no longer supported in the repos, use the vault
+	if [[ $arch =~ "linux" ]]; then
+		sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+		sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+		sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+		sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+	fi
 	# prepare the user build with sudo rights
 	echo "installing sudo ($arch)"
 	# to stop "checksum is invalid" errors when using yum in 32 bit docker
-	if [ "$arch" = linux-ix86 ] ; then
-		rm -f /etc/yum.repos.d/phusion_centos-6-scl-i386.repo
-		echo "change repos to vault"
-		curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
-		curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
-		if ! rpm --quiet --query yum-plugin-ovl; then
-			yum install -q -y yum-plugin-ovl
-		fi
-	fi
 	if ! rpm --quiet --query sudo; then
 		yum install -q -y sudo
 	fi
@@ -125,7 +127,7 @@ if [ "$1" = "stage2" ] ; then
 	# usermod -a -G wheel build
 	echo "build ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-build
 	# default nr of processes (for user build) is sometimes not enough
-	sudo sed -i 's/1024/10240/' /etc/security/limits.d/90-nproc.conf
+	sudo sed -i 's/4096/10240/' /etc/security/limits.d/20-nproc.conf
 	# (re)start script for stage 3: running the actual code
 	sudo -u build bash /io/$file "stage3" ${@:2}
 	exit
@@ -140,30 +142,6 @@ function yuminstall {
 	fi
 }
 
-# centos 6 is EOL, moved to vault: adapt the repos
-if [ "$arch" = "linux-ix86" ] ; 	then
-
-rm -f /etc/yum.repos.d/phusion_centos-6-scl-i386.repo
-if ! cat /etc/yum.repos.d/CentOS-Base.repo | grep --quiet vault; then
-	echo "change repos to vault"
-	curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
-	curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
-fi
-
-
-else
-
-if ! cat /etc/yum.repos.d/CentOS-Base.repo | grep --quiet vault; then
-	echo "change repos to vault"
-	sudo curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
-	sudo curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
-	sudo curl https://www.getpagespeed.com/files/centos6-scl-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl.repo
-	sudo curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
-fi
-
-fi
-# endof: centos 6 is EOL, moved to vault: adapt the repos
-
 file=$2
 # install yuminstall and env vars in .bashrc so it will be available if the new shell is started
 mkdir -p /home/build
@@ -176,6 +154,7 @@ uid=$4
 gid=$5
 srcdir=$6
 builddir=$7
+clear=$8
 " > /home/build/.bashrc
 
 echo 'if [ "$arch" = 'linux-ix86' ] ; then
@@ -186,6 +165,7 @@ elif [ "$arch" = 'windows-ix86' ] ; then
 	ARCH='-windows-ix86'
 	arch=windows-ix86
 	bits=64
+	sudo yum install epel-release
 	sudo yum install -y mingw64-gcc mingw64-zlib mingw64-zlib-static
 	sudo yum install -y mingw32-gcc mingw32-zlib mingw32-zlib-static
 	# sudo yum install -y mingw64-g++ mingw64-libgnurx-static mingw64-boost mingw64-boost-static
@@ -211,8 +191,9 @@ elif [ "$arch" = 'windows-x86_64' ] ; then
 	ARCH='-windows-x86_64'
 	arch=windows-x86_64
 	bits=64
+	sudo yum install epel-release
 	sudo yum install -y mingw64-gcc mingw64-zlib mingw64-zlib-static
-	# sudo yum install -y mingw64-g++ mingw64-libgnurx-static mingw64-boost mingw64-boost-static
+	sudo yum install -y mingw64-g++ mingw64-libgnurx-static mingw64-boost mingw64-boost-static
 	export CROSSTARGET="w64-mingw32"
 	export TARGETARCHITECTURE="x86_64"
 	#
@@ -243,10 +224,10 @@ function yuminstall {
 	fi
 }
 ' >> /home/build/.bashrc
-shift 7;
+shift 8;
 
-if [ $(basename "$file") = "start_hbb.sh" ] ; then
-	# if run as start_hbb.sh directly, show a shell
+if [ $(basename "$file") = "start_hbb3.sh" ] ; then
+	# if run as start_hbb3.sh directly, show a shell
 	echo "shell started by start_hbb.sh"
 	bash
 	exit
