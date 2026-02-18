@@ -2,7 +2,7 @@
 
 tclversion=8.5.19
 
-# This script builds some packages using the Holy build box environment
+# This script builds some packages (tdom, Tclx, expect, rbc, Tktable) using the Holy build box environment
 # and installs them in dirtcl
 # options:
 # -b|-bits|--bits: 32 for 32 bits build (default 64)
@@ -20,6 +20,9 @@ tclversion=8.5.19
 # stop on error
 set -e
 
+# print all executed commands to the terminal
+set -x
+
 # Prepare and start docker with Holy Build box
 # ============================================
 
@@ -31,8 +34,8 @@ source "${dir}/start_hbb.sh"
 # ===============
 
 while [[ "$#" -gt 0 ]]; do case $1 in
-	-v|-version|--version) tclversion="$2"; shift;;
-	*) echo "Unknown parameter: $1"; exit 1;;
+    -v|-version|--version) tclversion="$2"; shift;;
+    *) echo "Unknown parameter: $1"; exit 1;;
 esac; shift; done
 
 tclshortversion=${tclversion%.*}
@@ -48,15 +51,14 @@ tclshortversion=${tclversion%.*}
 # HBB is in this case only used for glibc compat, not static libs
 # source /hbb_shlib/activate
 
-# print all executed commands to the terminal
-set -x
-
 # set up environment
 # ------------------
 
-# X libraries are needed to make Tk, wget to download from sourceforge
-yuminstall libX11-devel
-yuminstall wget
+# put dirtcl tclsh in PATH
+mkdir /build/bin || true
+cd /build/bin
+ln -sf $dirtcldir/tclsh.exe .
+PATH=/build/bin:$PATH
 
 # locations
 tcldir=/build/tcl$tclversion
@@ -64,11 +66,25 @@ tkdir=/build/tk$tclversion
 dirtcldir=/build/dirtcl$tclversion-$arch
 destdir=$dirtcldir/exts
 
-# put dirtcl tclsh in PATH
-mkdir /build/bin || true
-cd /build/bin
-ln -sf $dirtcldir/tclsh .
-PATH=/build/bin:$PATH
+if [ $arch = "linux-x86_64" ] || [ $arch = "windows-x86_64" ]; then
+    yuminstall devtoolset-9
+    ## use source instead of scl enable so it can run in a script
+    ## scl enable devtoolset-9 bash
+    source /opt/rh/devtoolset-9/enable
+fi
+if [[ $arch =~ "linux" ]]; then
+    # X libraries are needed to make Tk, wget to download from sourceforge
+    yuminstall libX11-devel
+    CROSSCOMPILE=""
+    # ln -s $dirtcldir/tclsh /build/bin/tclsh
+else
+    yuminstall wine
+    CROSSCOMPILE="--host=$HOST --build=x86_64-linux"
+    echo -e "#"'!'"/bin/bash\nWINEDEBUG=-all wine $dirtcldir/tclsh$tclwinshortversion.exe \$@\n" > /build/bin/tclsh
+    chmod ug+x /build/bin/tclsh
+    cp /build/bin/tclsh /build/bin/tclsh8.5
+fi
+yuminstall wget
 
 # Build
 # -----
@@ -76,191 +92,327 @@ PATH=/build/bin:$PATH
 mkdir /build/packages || true
 cd /build/packages
 
-# Extral
-# ------
-version=2.1.0
-cd /build/packages
-wget -c https://sourceforge.net/projects/extral/files/Extral-$version.src.tar.gz
-tar xvzf Extral-$version.src.tar.gz
-mv Extral Extral-$version || true
-cd Extral-$version
-rm -rf linux-$arch
-mkdir linux-$arch || true
-cd linux-$arch
-make distclean || true
-../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
-make
-rm -rf $destdir/Extral-$version
-tclsh ../build/install.tcl $destdir
-chown -R $uid.$gid $destdir/Extral-$version
-
-# ClassyTcl
-# ---------
-version=1.1.0
-cd /build/packages
-wget -c https://sourceforge.net/projects/classytcl/files/ClassyTcl-$version-src.tar.gz
-tar xvzf ClassyTcl-$version-src.tar.gz
-mv ClassyTcl ClassyTcl-$version || true
-cd ClassyTcl-$version
-rm -rf linux-$arch
-mkdir linux-$arch
-cd linux-$arch
-make distclean || true
-../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
-make
-rm -rf $destdir/Class$version
-tclsh ../build/install.tcl $destdir
-chown -R $uid.$gid $destdir/Class$version
-
-# ClassyTk
-# ---------
-prog=ClassyTk
-version=1.1.0
-cd /build/packages
-wget -c https://sourceforge.net/projects/classytcl/files/$prog-$version-src.tar.gz
-tar xvzf $prog-$version-src.tar.gz
-mv $prog $prog-$version || true
-cd $prog-$version
-rm -rf linux-$arch
-mkdir linux-$arch
-cd linux-$arch
-make distclean || true
-../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
-make
-rm -rf $destdir/$prog-$version
-tclsh ../build/install.tcl $destdir
-chown -R $uid.$gid $destdir/$prog-$version
-
-# sqlite
-# ------
-cd /build/
-wget -c https://www.sqlite.org/2019/sqlite-autoconf-3270200.tar.gz
-tar xvzf sqlite-autoconf-3270200.tar.gz
-cd /build/sqlite-autoconf-3270200
-CFLAGS="-fPIC -Os -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 -DSQLITE_ENABLE_RTREE=1" \
-./configure --enable-shared --enable-static --enable-threadsafe --enable-dynamic-extensions
-make
-sudo make install
-sudo rm /usr/local/lib/libsqlite3.so*
-
-# dbi
-# ---
-prog=dbi_sqlite3
-version=1.0.0
-url=http://sourceforge.net/projects/tcl-dbi/files/dbi-1.0.0-src.tar.gz
-target=$dirtcldir/exts/$prog-$version
-cd /build/packages
-wget -c $url
-tar xvzf dbi-$version-src.tar.gz
-mv dbi dbi$version || true
-cd /build/packages/dbi$version/sqlite3
-make distclean || true
-./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
-make
-cp /io/packages/dbi_sqlite3-1.0.0-pkgIndex.tcl pkgIndex.tcl
-rm -rf $dirtcldir/exts/dbi_sqlite3-$version
-./build/install.tcl $dirtcldir/exts
+## Extral
+## ------
+#version=2.1.0
+#cd /build/packages
+#wget -c --no-check-certificate https://sourceforge.net/projects/extral/files/Extral-$version.src.tar.gz
+#tar xvzf Extral-$version.src.tar.gz
+#rm -rf Extral-$version
+#mv Extral Extral-$version || true
+#cd /build/packages/Extral-$version
+#cp Makefile.in Makefile.in.ori || true
+#sed 's/@TCLSH_PROG@/tclsh/g' Makefile.in.ori > Makefile.in
+#rm -rf $arch
+#mkdir $arch || true
+#cd $arch
+#make distclean || true
+#../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" $CROSSCOMPILE
+#make
+#rm -rf $destdir/Extral-$version
+#tclsh ../build/install.tcl $destdir
+#chown -R $uid.$gid $destdir/Extral-$version
+#
+## ClassyTcl
+## ---------
+#version=1.1.0
+#cd /build/packages
+#wget -c --no-check-certificate https://sourceforge.net/projects/classytcl/files/ClassyTcl-$version-src.tar.gz
+#tar xvzf ClassyTcl-$version-src.tar.gz
+#mv ClassyTcl ClassyTcl-$version || true
+#cd /build/packages/ClassyTcl-$version
+#cp Makefile.in Makefile.in.ori || true
+#sed 's/@TCLSH_PROG@/tclsh/g' Makefile.in.ori > Makefile.in
+#rm -rf $arch
+#mkdir $arch
+#cd $arch
+#make distclean || true
+#../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" $CROSSCOMPILE
+#make
+#rm -rf $destdir/Class$version
+#tclsh ../build/install.tcl $destdir
+#chown -R $uid.$gid $destdir/Class$version
+#
+## ClassyTk
+## ---------
+#prog=ClassyTk
+#version=1.1.0
+#cd /build/packages
+#wget -c --no-check-certificate https://sourceforge.net/projects/classytcl/files/$prog-$version-src.tar.gz
+#tar xvzf $prog-$version-src.tar.gz
+#mv $prog $prog-$version || true
+#cd /build/packages/$prog-$version
+#cp Makefile.in Makefile.in.ori || true
+#sed 's/@TCLSH_PROG@/tclsh/g' Makefile.in.ori > Makefile.in
+#rm -rf $arch
+#mkdir $arch
+#cd $arch
+#make distclean || true
+#../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
+#make
+#rm -rf $destdir/$prog-$version
+#tclsh ../build/install.tcl $destdir
+#chown -R $uid.$gid $destdir/$prog-$version
+#
+## sqlite
+## ------
+#cd /build/
+#sqliteversion=3390300
+#sqliteyear=2022
+#wget -c --no-check-certificate https://www.sqlite.org/$sqliteyear/sqlite-autoconf-$sqliteversion.tar.gz
+#tar xvzf sqlite-autoconf-$sqliteversion.tar.gz
+#cd /build/sqlite-autoconf-$sqliteversion
+#make distclean
+##CFLAGS="-fPIC -Os -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS3_PARENTHESIS=1 -DSQLITE_ENABLE_RTREE=1" \
+##./configure --enable-shared --enable-static --enable-threadsafe --enable-dynamic-extensions $CROSSCOMPILE
+#./configure --disable-shared --enable-static --enable-threadsafe --enable-dynamic-extensions $CROSSCOMPILE
+#make
+#sudo make install
+#sudo rm /usr/local/lib/libsqlite3.so*
+#
+## dbi
+## ---
+#prog=dbi_sqlite3
+#version=1.0.0
+#url=http://sourceforge.net/projects/tcl-dbi/files/dbi-1.0.0-src.tar.gz
+#target=$dirtcldir/exts/$prog-$version
+#cd /build/packages
+#wget -c --no-check-certificate $url
+#tar xvzf dbi-$version-src.tar.gz
+#mv dbi dbi$version || true
+#cd /build/packages/dbi$version/sqlite3
+#cp Makefile.in Makefile.in.ori || true
+#sed 's/@TCLSH_PROG@/tclsh/g' Makefile.in.ori > Makefile.in
+#rm -rf $arch
+#mkdir $arch || true
+#cd $arch
+#make distclean || true
+#../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" $CROSSCOMPILE
+#make
+#cp /io/packages/dbi_sqlite3-1.0.0-pkgIndex.tcl ../pkgIndex.tcl
+#rm -rf $dirtcldir/exts/dbi_sqlite3-$version
+#../build/install.tcl $dirtcldir/exts
 
 # rbc
 # ---
+
 prog=rbc
 version=0.1
-target=$dirtcldir/exts/$prog$version
-cd /build/packages
-wget -c http://sourceforge.net/projects/genomecomb/files/deps/$prog-$version-src.tar.gz
-tar xvzf $prog-$version-src.tar.gz
-cd $prog
-./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --with-tk="$dirtcldir/lib"
-make install
-rm -rf $dirtcldir/exts/$prog$version
-mv $dirtcldir/lib/$prog$version $dirtcldir/exts
-rm -f $target/init.tcl
-cp -f /io/packages/$prog-$version-init.tcl $target/init.tcl
-rm -f $target/pkgIndex.tcl
-cp /io/packages/$prog-$version-pkgIndex.tcl $target/pkgIndex.tcl
-rm -rf "$target/linux-$arch"
-mkdir "$target/linux-$arch"
-mv "$target/lib$prog$version.so" "$target/linux-$arch"
+if [ "$arch" = "windows-x86_64" ] ; 	then
+	mkdir /build/packages/$prog-$version-$arch
+	cd /build/packages/$prog-$version-$arch
+	wget https://teapot.activestate.com/package/name/$prog/ver/$version/arch/win32-x86_64/file.zip
+	unzip file.zip
+	rm file.zip
+	target=$dirtcldir/exts/$prog$version
+	rm -rf $target
+	mkdir $target
+	cp -a * $target
+	echo 'package require Tk
+load [file join $dir rbc0.1.dll] 
+source [file join $dir graph.tcl]' > $target/init.tcl
+else 
+	target=$dirtcldir/exts/$prog$version
+	cd /build/packages
+	wget -c --no-check-certificate http://sourceforge.net/projects/genomecomb/files/deps/$prog-$version-src.tar.gz
+	tar xvzf $prog-$version-src.tar.gz
+	cd /build/packages/$prog
+	make distclean
+	LDFLAGS='-static-libgcc -static-libstdc++' ./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --with-tk="$dirtcldir/lib" $CROSSCOMPILE
+	WIN32=1 make install
+	rm -rf $dirtcldir/exts/$prog$version
+	mv $dirtcldir/lib/$prog$version $dirtcldir/exts
+	rm -f $target/init.tcl
+	cp -f /io/packages/$prog-$version-init.tcl $target/init.tcl
+	rm -f $target/pkgIndex.tcl
+	cp /io/packages/$prog-$version-pkgIndex.tcl $target/pkgIndex.tcl
+	rm -rf "$target/$arch"
+	mkdir "$target/$arch"
+	mv "$target/lib$prog$version.so" "$target/$arch"
+fi
 
 # Tktable
 # -------
-prog=Tktable
-version=2.10
-# url=http://sourceforge.net/projects/tktable/files/tktable/$version/$prog$version.tar.gz
-# generic sourceforge url no longer seems to work within HBB, so use direct link (to one of the mirrors)
-url=https://netcologne.dl.sourceforge.net/project/tktable/tktable/$version/$prog$version.tar.gz
-target=$dirtcldir/exts/$prog$version
-cd /build/packages
-wget -c $url
-tar xvzf $prog$version.tar.gz
-cd $prog$version
-./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --with-tk="$dirtcldir/lib"
-make install
-rm -rf $dirtcldir/exts/$prog$version
-mv $dirtcldir/lib/$prog$version $dirtcldir/exts
-rm -f $target/init.tcl
-cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
-rm -f $target/pkgIndex.tcl
-cp /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
-rm -rf "$target/linux-$arch"
-mkdir "$target/linux-$arch"
-mv "$target/lib$prog$version.so" "$target/linux-$arch"
+if [ "$arch" = "windows-x86_64" ] ; 	then
+	version=2.11
+	mkdir /build/packages/tktable-$version-$arch
+	cd /build/packages/tktable-$version-$arch
+	wget https://teapot.activestate.com/package/name/Tktable/ver/$version/arch/win32-x86_64/file.zip
+	unzip file.zip
+	rm file.zip
+	target=$dirtcldir/exts/$prog$version
+	rm -rf $target
+	mkdir $target
+	cp -a * $target
+	echo 'package require Tcl 8.2
+load [file join $dir Tktable211.dll] Tktable
+extension provide Tktable 2.11' > $target/init.tcl
+else 
+	prog=Tktable
+	version=2.10
+	# url=http://sourceforge.net/projects/tktable/files/tktable/$version/$prog$version.tar.gz
+	# generic sourceforge url no longer seems to work within HBB, so use direct link (to one of the mirrors)
+	url=https://netcologne.dl.sourceforge.net/project/tktable/tktable/$version/$prog$version.tar.gz
+	target=$dirtcldir/exts/$prog$version
+	cd /build/packages
+	wget -c $url
+	tar xvzf $prog$version.tar.gz
+	cd $prog$version
+	make distclean || true
+	./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --with-tk="$dirtcldir/lib" $CROSSCOMPILE
+	make install
+	rm -rf $dirtcldir/exts/$prog$version
+	mv $dirtcldir/lib/$prog$version $dirtcldir/exts
+	rm -f $target/init.tcl
+	cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
+	rm -f $target/pkgIndex.tcl
+	cp /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
+	rm -rf "$target/$arch"
+	mkdir "$target/$arch"
+	mv "$target/lib$prog$version.so" "$target/$arch"
+fi
 
 # Tclx
 # ----
 prog=Tclx
-version=8.4
-url=http://sourceforge.net/projects/tclx/files/TclX/$version.0/tclx$version.tar.bz2
-target=$dirtcldir/exts/$prog$version
-cd /build/packages
-wget -c $url
-tar xvjf tclx$version.tar.bz2
-cd tclx$version
-./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
-make install
-rm -rf /build/dirtcl$tclversion-x86_64/man
-rm -rf $target
-mv $dirtcldir/lib/tclx$version $target
-rm -f $target/init.tcl
-rm -f $target/pkgIndex.tcl
-rm -rf $target/lib
-mkdir $target/lib
-mv $target/*.tcl $target/lib
-cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
-cp /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
-rm -rf "$target/linux-$arch"
-mkdir "$target/linux-$arch"
-mv "$target/libtclx$version.so" "$target/linux-$arch"
+version=8.6.3
+shortversion=8.6
+url=https://github.com/flightaware/tclx/archive/refs/tags/v8.6.3.tar.gz
+
+if [ "$arch" = "windows-x86_64" ] ; 	then
+	mkdir /build/packages/Tclx-$version-$arch
+	cd /build/packages/Tclx-$version-$arch
+	wget https://teapot.activestate.com/package/name/Tclx/ver/8.4/arch/win32-x86_64/file.zip
+	unzip file.zip
+	rm file.zip
+	target=$dirtcldir/exts/$prog$version
+	rm -rf $target
+	mkdir $target
+	cp -a * $target
+	echo 'if {![package vsatisfies [package provide Tcl] 8.4]} return
+package ifneeded Tclx 8.4 [string map [list @ $dir] {
+        package require Tcl 8.4
+            set ::env(TCLX_LIBRARY) {@}
+            load [file join {@} tclx84.dll] Tclx
+        package provide Tclx 8.4
+    }]
+' > $target/pkgIndex.tcl
+	echo 'package require Tcl 8.4
+set ::env(TCLX_LIBRARY) $dir
+load [file join $dir tclx84.dll] Tclx
+extension provide Tclx 8.4' > $target/init.tcl
+
+else 
+	target=$dirtcldir/exts/$prog$version
+	# url=http://sourceforge.net/projects/tclx/files/TclX/$version.0/tclx$version.tar.bz2
+	cd /build/packages
+	wget -c --no-check-certificate $url
+	mv v$version.tar.gz tclx$version.tar.gz
+	tar xvzf tclx$version.tar.gz
+	cd /build/packages/tclx-$version
+	make distclean || true
+	./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" $CROSSCOMPILE
+	make install
+	rm -rf /build/dirtcl$tclversion-x86_64/man
+	rm -rf $target
+	mv $dirtcldir/lib/tclx$shortversion $target
+	mkdir $target/$arch
+	mv $target/libtclx$shortversion.so $target/$arch/libtclx$version.so
+	echo "package require pkgtools
+set env(TCLX_LIBRARY) \$dir/lib
+load [file join \$dir [pkgtools::architecture] libtclx$version.so] Tclx
+" > $target/init.tcl
+	echo "package ifneeded Tclx $version \"package require pkgtools ; set env(TCLX_LIBRARY) \$dir/lib ; load \[file join [list \$dir] \[pkgtools::architecture\] libtclx$version.so\] \"" > $target/pkgIndex.tcl
+fi
 
 # tdom
 # ----
 prog=tdom
-version=0.8.3
-url=https://github.com/tDOM/tdom/archive/tdom_0_8_3_postrelease.tar.gz
-target=$dirtcldir/exts/$prog$version
-cd /build/packages
-wget -c $url
-tar xvzf tdom_0_8_3_postrelease.tar.gz
-cd tdom-tdom_0_8_3_postrelease
-./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib"
-make install
-rm -rf /build/dirtcl$tclversion-x86_64/man
-rm -rf $target
-mv $dirtcldir/lib/$prog$version $target
-rm -f $target/init.tcl
-rm -f $target/pkgIndex.tcl
-cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
-cp -f /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
-rm -rf "$target/linux-$arch"
-mkdir "$target/linux-$arch"
-mv "$target/libtdom$version.so" "$target/linux-$arch"
-rm "$target/libtdomstub$version.a"
+#version=0.8.3
+#url=https://github.com/tDOM/tdom/archive/tdom_0_8_3_postrelease.tar.gz
+version=0.9.4
+url=http://tdom.org/downloads/tdom-$version-src.tgz
+if [ "$arch" = "windows-x86_64" ] ; 	then
+	mkdir /build/packages/tdom-$version-$arch
+	cd /build/packages/tdom-$version-$arch
+	wget https://teapot.activestate.com/package/name/tdom/ver/$version/arch/win32-x86_64/file.zip
+	unzip file.zip
+	rm file.zip
+	target=$dirtcldir/exts/$prog$version
+	rm -rf $target
+	mkdir $target
+	cp -a * $target
+	echo 'package require Tcl 8.4
+load [file join $dir tdom083.dll] tdom
+source [list [file join $dir tdom.tcl]]
+' > $target/init.tcl
 
-# Change owner and group
-# ----------------------
-# change user and group on generated files
-chown $uid.$gid /build/tcl$tclversion-src.tar.gz /build/tk$tclversion-src.tar.gz
-chown -R $uid.$gid /build/tcl$tclversion /build/tk$tclversion /build/dirtcl$tclversion-$arch
-chown -h $uid.$gid /build/dirtcl-$arch /build/dirtcl
+else 
+	target=$dirtcldir/exts/$prog$version
+	cd /build/packages
+	wget -c --no-check-certificate $url
+	# tar xvzf tdom_0_8_3_postrelease.tar.gz
+	# cd tdom-tdom_0_8_3_postrelease
+	tar xvzf tdom-$version-src.tgz
+	cd /build/packages/tdom-$version-src
+	mv generic/tclexpat.c generic/tclexpat.c.ori || true
+	# patch: code used strlen as a variable name, causing compile errors (clashes with the lib function)
+	cp /io/build/patches/tdom-0-9-4-tclexpat.c generic/tclexpat.c
+	# patch: The Tcl_PkgProvide* in the code caused circular package dependency errors (for reasons I could not figure out)
+	# commented them out, and do package provide in tcl init code
+	cp generic/tdominit.c generic/tdominit.c.ori || true
+	sed -i 's/^\([[:space:]]*\)Tcl_PkgProvide(interp, PACKAGE_NAME, PACKAGE_VERSION);/\1\/\* & \*\//' generic/tdominit.c
+	sed -i '/Tcl_PkgProvideEx(interp, PACKAGE_NAME, PACKAGE_VERSION,/{N;s/\(Tcl_PkgProvideEx(interp, PACKAGE_NAME, PACKAGE_VERSION,[[:space:]]*\n[[:space:]]*(ClientData) &tdomStubs);\)/\/\* \1 \*\//}' generic/tdominit.c
+	# compile
+	make distclean || true
+	./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --disable-stubs --enable-64bit $CROSSCOMPILE
+	make
+	make install
+	rm -rf /build/dirtcl$tclversion-x86_64/man || true
+	rm -rf $target || true
+	mv $dirtcldir/lib/$prog$version $target
+	rm -f $target/init.tcl || true
+	rm -f $target/pkgIndex.tcl || true
+#	cp -f /io/packages/$prog$version-init.tcl $target/init.tcl
+#	cp -f /io/packages/$prog$version-pkgIndex.tcl $target/pkgIndex.tcl
+	echo "package require pkgtools
+load [file join \$dir [pkgtools::architecture] libtdom$version.so]
+package provide tdom $version
+source [file join \$dir tdom.tcl]
+extension provide tdom $version" > $target/init.tcl
+	echo "package ifneeded tdom $version \"package require pkgtools ; load \[file join [list \$dir] \[pkgtools::architecture\] libtdom$version.so\] ; package provide tdom $version ; source [file join \$dir tdom.tcl] ; extension provide tdom $version\"" > $target/pkgIndex.tcl
+	rm -rf "$target/$arch"
+	mkdir "$target/$arch"
+	mv "$target/libtdom$version.so" "$target/$arch"
+	rm "$target/libtdomstub$version.a"
+fi
+
+# expect
+# ------
+version=5.45.4
+cd /build/packages
+wget -c --no-check-certificate https://sourceforge.net/projects/expect/files/Expect/$version/expect$version.tar.gz
+
+tar xvzf expect$version.tar.gz
+cd /build/packages/expect$version
+rm -rf $arch
+mkdir $arch || true
+cd $arch
+make distclean
+../configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --enable-shared --disable-static $CROSSCOMPILE
+make libexpect$version.so
+
+# make distribution
+rm -rf $destdir/Expect-$version
+mkdir $destdir/Expect-$version
+cp libexpect$version.so $destdir/Expect-$version
+
+echo "package ifneeded Expect 5.45.4 [list load [file join \$dir libexpect$version.so]]\
+" > $destdir/Expect-$version/pkgIndex.tcl
+
+echo "load [file join \$dir libexpect$version.so]\
+" > $destdir/Expect-$version/init.tcl
+
+chown -R $uid.$gid $destdir/Expect-$version
 
 echo "Finished building packages"
