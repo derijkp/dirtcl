@@ -141,7 +141,9 @@ proc extension {cmd args} {
 				error "can't find extension $name $version"
 			}
 		}
-		if {[info exists ext::loaded($name-$fversion)]} {
+		if {[package provide $name] ne ""} {
+			return [package provide $name]
+		} elseif {[info exists ext::loaded($name-$fversion)]} {
 			return $ext::loaded($name-$fversion)
 		} else {
 			set f [open $dir/init.tcl]
