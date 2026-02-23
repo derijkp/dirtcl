@@ -1,6 +1,7 @@
 #!/bin/bash
 
-tclversion=8.6.14
+# tclversion=8.6.14
+tclversion=9.0.3
 
 # This script builds dirtcl using the Holy build box environment
 # options:

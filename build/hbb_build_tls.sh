@@ -1,6 +1,6 @@
 #!/bin/bash
 
-tclversion=8.6.14
+tclversion=9.0.3
 opensslversion=3.3.1
 opensslversion=3.5.2
 tcltlsversion=2.0b1
@@ -119,12 +119,13 @@ prog=tcltls
 finalprog=tls
 version=$tcltlsversion
 tlsdownload=tcltls-$version
+# tlsdownload=tcltls-$version-src
 tlsdir=tcltls-$version
 
 target=$dirtcldir/exts/$prog$version
-finaltarget=$dirtcldir/exts/$finalprog$version
+finaltarget=$dirtcldir/exts/$finalprog-$version
 cd /build/packages
-wget https://chiselapp.com/user/bohagan/repository/TCLTLS/uv/tcltls-2.0b1.tar.gz
+wget -c https://chiselapp.com/user/bohagan/repository/TCLTLS/uv/tcltls-$tcltlsversion.tar.gz
 # wget -c https://core.tcl-lang.org/tcltls/uv/$tlsdownload.tar.gz
 rm -rf $tlsdownload || true
 tar xvzf $tlsdownload.tar.gz
@@ -143,17 +144,9 @@ grep -v 'Unable to compile a basic program using OpenSSL' configure.ori > config
 chmod u+x configure
 
 #  --with-openssl-dir=/usr/local/lib64
-if [[ $arch =~ "linux" ]]; then
-    if [ $arch = "linux-x86_64" ]; then
-        libdir=/usr/local/lib64
-    else
-        libdir=/usr/local/lib
-    fi
-    ./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --enable-static-ssl --enable-64bit
-else
     ./configure --prefix="$dirtcldir" --with-tcl="$dirtcldir/lib" --enable-static-ssl --enable-64bit \
         --with-openssl-dir=/usr/local/openssl --with-openssl-libdir=/usr/local/openssl/lib64
-fi
+
 # hack to make it compile (added -DOPENSSL_NO_DH to CFLAGS), no longer needed (with newer openssl?)
 # cp /io/build/patches/tcltls-1.7.22_Makefile Makefile
 

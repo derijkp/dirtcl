@@ -1,10 +1,11 @@
 namespace eval ext {}
 
 proc ext::unknown {name {version {}} {exact {}}} {
+	set ::ext::loading($name) 1
 	if {$exact eq "-exact"} {
-		set error [catch {extension require -exact $name $version} result]
+		set error [catch {extension unknown -exact $name $version} result]
 	} else {
-		set error [catch {extension require $name $version} result]
+		set error [catch {extension unknown $name $version} result]
 	}
 	if {$error} {
 		if {[string match "can't find extension*" $result]} {
@@ -66,7 +67,8 @@ proc ext::updatecatalog_dir {pathdir {pre {}}} {
 	set list [glob -nocomplain $pathdir/*]
 	foreach file $list {
 		set tail [file tail $file]
-		if {[regexp {^(.*?)-?([0-9.]+)$} $tail temp name version]} {
+		if {[regexp {^(.*?)-([0-9.]+[ab][0-9.]?)$} $tail temp name version]} {
+		} elseif {[regexp {^(.*?)-?([0-9.]+)$} $tail temp name version]} {
 		} elseif {[regexp {^(.*?)-?([0-9.]+[A-Za-z0-9]+)$} $tail temp name version]} {
 		} else {
 			ext::updatecatalog_dir $file ${tail}::
@@ -105,12 +107,30 @@ proc ext::updatecatalog {} {
 	set catalog_path $ext_path
 }
 
+proc ext::load {dir} {
+	set f [open $dir/init.tcl]
+	set c [read $f]
+	close $f
+	if {[info exists ::dir]} {
+		set keepdir $::dir
+		set ::dir $dir
+		set error [catch {uplevel #0 $c} errormsg]
+		set ::dir $keepdir
+	} else {
+		set ::dir $dir
+		set error [catch {uplevel #0 $c} errormsg]
+		unset ::dir
+	}
+	if {$error} {error $errormsg}
+	return $errormsg
+}
+
 proc extension {cmd args} {
 	global ext_path ext::loaded
 	upvar #0 ext::catalog catalog
 	ext::updatecatalog
 	switch $cmd {
-	require {
+	unknown - require {
 		if {[lindex $args 0] eq "-exact"} {
 			set exact 1
 			foreach {temp name version} $args break
@@ -146,19 +166,9 @@ proc extension {cmd args} {
 		} elseif {[info exists ext::loaded($name-$fversion)]} {
 			return $ext::loaded($name-$fversion)
 		} else {
-			set f [open $dir/init.tcl]
-			set c [read $f]
-			close $f
-			if {[info exists ::dir]} {
-				set keepdir $::dir
-				set ::dir $dir
-				set error [catch {uplevel #0 $c} errormsg]
-				set ::dir $keepdir
-				if {$error} {error $errormsg}
-			} else {
-				set ::dir $dir
-				uplevel #0 $c
-				unset ::dir
+			package ifneeded $name $fversion "[::list ext::load $dir]"
+			if {$cmd eq "require"} {
+				ext::load $dir
 			}
 			return $fversion
 		}

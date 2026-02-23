@@ -2,10 +2,11 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-set tclversion 8.6.14
+set tclversion 9.0.3
 set threaded 1
 set os $tcl_platform(os)
 set platform $tcl_platform(platform)
+set dirtcldir [pwd]
 
 set configureopts {}
 while 1 {
@@ -37,11 +38,23 @@ while 1 {
 				error "--os must be one of Linux, Windows or crosswin"
 			}
 		}
+		{^--dirtcldir$} {
+			set dirtcldir [lindex $argv 1]
+			set argv [lrange $argv 2 end]
+			file mkdir $dirtcldir
+		}
 		default break
 	}
 }
 
+file mkdir $dirtcldir
+if {[llength [glob -nocomplain $dirtcldir/*]]} {
+	error "error: current directory (in which dirtcl should be build) is not empty"
+}
+cd $dirtcldir
+
 set tclshortversion [join [lrange [split $tclversion .] 0 1] .]
+set majorversion [lindex [split $tclversion .] 0]
 
 if {[lsearch $argv crosswin] != -1} {
 	set os Windows
@@ -56,7 +69,8 @@ if {$platform eq "unix"} {
 	set tcldir [file normalize ../tcl$tclversion/unix]
 	set tkdir [file normalize ../tk$tclversion/unix]
 	set sh sh
-	set sharedopt {--disable-shared --enable-static}
+	# set sharedopt {--disable-shared --enable-static}
+	set sharedopt {--disable-shared}
 	set ext ""
 } elseif {$platform eq "windows"} {
 	set tcldir [file normalize ../tcl$tclversion/win]
@@ -82,12 +96,6 @@ if {"$tcl_platform(platform)" eq "unix" || "$tcl_platform(platform)" eq "crosswi
 	}
 }
 if {$script eq ""} {set scriptdir [pwd]} else {set scriptdir [file dir $script]}
-
-set dirtcldir [pwd]
-
-if {[llength [glob -nocomplain $dirtcldir/*]]} {
-	error "error: current directory (in which dirtcl should be build) is not empty"
-}
 
 set dir $scriptdir
 if {$dir ne {}} {cd $dir}
@@ -188,6 +196,7 @@ static char initScript[] =
 # -------------------------
 
 foreach dir [list $basetcldir/unix $basetcldir/win] {
+
 # convert tclAppInit.c
 # -----------------
 set file $dir/tclAppInit.c
@@ -204,7 +213,7 @@ set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
 set c [rewrite_before "if (Tcl_Init(interp) == TCL_ERROR)" "if ((Tcl_Init)(interp) == TCL_ERROR)" $c {
 #ifdef DIRTCL
     Tcl_Obj *temp;
-    TclSetPreInitScript(preInitCmd);
+    Tcl_SetPreInitScript(preInitCmd);
 #endif /* DIRTCL */
     }]
 set c [rewrite_before "return TCL_OK" $c {
@@ -220,7 +229,7 @@ set c [rewrite_before "return TCL_OK" $c {
 #endif /* DIRTCL */
     }]
 
-if {$tclshortversion eq "8.6"} {
+if {$tclshortversion eq "8.6" || $majorversion >= 9} {
 	set c [rewrite_replace $c {TclSetStartupScriptFileName(Tcl_GetStringFromObj(temp,NULL));} \
 		{Tcl_SetStartupScript(temp, (const char *)NULL);}]
 }
@@ -277,7 +286,7 @@ set c [rewrite_before "int\nTcl_AppInit(" $c $preinitcode]
 set extracode {
 #ifdef DIRTCL
     Tcl_Obj *temp;
-    TclSetPreInitScript(preInitCmd);
+    Tcl_SetPreInitScript(preInitCmd);
 #endif /* DIRTCL */
     }
 if {[catch {
@@ -290,6 +299,12 @@ set anchor {Tcl_SetVar(interp, "tcl_rcFileName", "~/wishrc.tcl", TCL_GLOBAL_ONLY
 if {[string first $anchor $c] == -1} {
 	set anchor {Tcl_ObjSetVar2(interp, Tcl_NewStringObj("tcl_rcFileName", -1), NULL,
 	    Tcl_NewStringObj("~/wishrc.tcl", -1), TCL_GLOBAL_ONLY);}
+	if {[string first $anchor $c] == -1} {
+		# Tcl9
+		set anchor {(void) Tcl_EvalEx(interp,
+	    "set tcl_rcFileName [file tildeexpand ~/wishrc.tcl]",
+	    -1, TCL_EVAL_GLOBAL);}
+	}
 }
 set c [rewrite_after $anchor $c {
 #ifdef DIRTCL
@@ -320,11 +335,13 @@ file_write $file $c
 
 puts "compiling tcl ($tcldir)"
 cd $tcldir
-if {$threaded == -1} {
-} elseif {$threaded} {
-	lappend configureopts {--enable-threads}
-} else {
-	lappend configureopts {--disable-threads}
+if {$majorversion < 9} {
+	if {$threaded == -1} {
+	} elseif {$threaded} {
+		lappend configureopts {--enable-threads}
+	} else {
+		lappend configureopts {--disable-threads}
+	}
 }
 puts platform=$platform
 if {$platform eq "crosswin"} {
@@ -346,14 +363,20 @@ if {[lsearch $argv noreconfig] == -1} {
 	}
 }
 set error [catch {outexec make} e]
+set error [catch {outexec make} e]
 puts $e
+
 if {$platform eq "unix" && $tclshortversion eq "8.6"} {
 	# for some reason the option to build static did not work here, 
 	# take a shortcut (not digging into configure to solve) and compile static tclsh manually
 	exec gcc -O2  -pipe    -Wl,--export-dynamic  tclAppInit.o \
 	        -Wl,-Bstatic -L/build/tcl8.6.14/unix -ltcl8.6 libtclstub8.6.a -lz -Wl,-Bdynamic -ldl  -lpthread -lm  \
 	        "-Wl,-rpath,/build/dirtcl8.6.14-linux-x86_64/lib" -o tclsh
-
+} elseif {$platform eq "unix" && $majorversion eq "9"} {
+	exec gcc -O2  -pipe -finput-charset=UTF-8    -Wl,--export-dynamic  tclAppInit.o \
+		-Wl,-Bstatic -L/build/tcl$tclversion/unix -ltcl$tclshortversion libtclstub.a -lz \
+		-Wl,-Bdynamic -ldl -lpthread -lm \
+		"-Wl,-rpath,/build/dirtcl$tclversion-linux-x86_64/lib" -o tclsh
 }
 
 catch {
@@ -395,6 +418,14 @@ puts $e
 # Convert to dirtcl
 # -----------------
 puts "Converting to dirtcl"
+if {$majorversion >= 9} {
+	file delete -force $dirtcldir/lib/tcl$tclshortversion
+	file copy -force /build/tcl$tclversion/library $dirtcldir/lib/tcl$tclshortversion
+	foreach file [glob /build/tk$tclversion/library/*] {
+		file copy -force $file $dirtcldir/lib/tk$tclshortversion
+	}
+}
+
 set files [glob $dirtcldir/bin/*]
 eval file rename $files $dirtcldir
 file delete $dirtcldir/bin
@@ -412,9 +443,16 @@ if {$platform eq "unix"} {
 file delete -force $dirtcldir/man
 # write boot.tcl
 file copy $scriptdir/boot.tcl $dirtcldir/lib/boot.tcl
-set tcllibdir [lindex [glob $dirtcldir/lib/tcl[string index $tcl_version 0].*] 0]
+set tcllibdir [lindex [glob -nocomplain $dirtcldir/lib/tcl[string index $tclversion 0].*] 0]
+if {![file exists $tcllibdir]} {
+	set tcllibdir [lindex [glob -nocomplain $dirtcldir/lib/tcl*/[lindex [split $tclversion .] 0].*] 0]
+}
+if {![file exists $tcllibdir]} {
+	set tcllibdir [lindex [glob -nocomplain $dirtcldir/lib/tcl[string index $tclversion 0]*] 0]
+}
 file copy $scriptdir/extension.tcl $tcllibdir
 set f [open $tcllibdir/tclIndex a]
+puts $f ""
 puts $f {set auto_index(extension) [list source [file join $dir extension.tcl]]}
 puts $f {set auto_index(ext::unknown) [list source [file join $dir extension.tcl]]}
 close $f
@@ -465,7 +503,7 @@ close $f
 if {$platform eq "unix"} {
 	set keeppwd [pwd]
 	cd $dirtcldir
-	exec ln -s [lindex [glob tclsh8*] 0] example$ext
+	exec ln -s [lindex [glob tclsh$majorversion*] 0] example$ext
 	cd $keeppwd
 } else {
 	file copy -force [lindex [glob $dirtcldir/tclsh*] 0] $dirtcldir/example$ext
@@ -484,7 +522,7 @@ close $f
 if {$platform eq "unix"} {
 	set keeppwd [pwd]
 	cd $dirtcldir
-	exec ln -s [lindex [glob tclsh8*] 0] tkexample$ext
+	exec ln -s [lindex [glob tclsh$majorversion*] 0] tkexample$ext
 	cd $keeppwd
 } elseif {$platform eq "crosswin"} {
 	file copy -force [lindex [glob $dirtcldir/tclsh*] 0] $dirtcldir/tkexample$ext
@@ -506,7 +544,7 @@ close $f
 if {$platform eq "unix"} {
 	set keeppwd [pwd]
 	cd $dirtcldir
-	exec ln -s [lindex [glob tclsh8*] 0] demos$ext
+	exec ln -s [lindex [glob tclsh$majorversion*] 0] demos$ext
 	cd $keeppwd
 } elseif {$platform eq "crosswin"} {
 	file copy -force [lindex [glob $dirtcldir/tclsh*] 0] $dirtcldir/demos$ext

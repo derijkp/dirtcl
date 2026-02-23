@@ -166,9 +166,11 @@ Installation manual
 -------------------
 makedirtcl.tcl is a Tcl script, and only needs a relatively recent version of Tcl (>=8.4).
 Running the script will install a dirtcl in the current directory (which must be empty)
-The Tcl and Tk sources (default 8.5.19) must be installed next to the dirtcl
-(../tcl8.5.19, ../tk8.5.19).
+The Tcl and Tk sources (default 9.0.3) must be installed next to the dirtcl
+(../tcl9.0.3, ../tk9.0.3).
 These sources will be patched, so do not mix with regular installs.
+
+By default dirtcl is build in the current directory:
 
 mkdir dirtcl
 cd dirtcl
@@ -180,6 +182,7 @@ You can give several options:
              create a Tcl 8.6 dirtcl (The patching happens intelligently,
              but large changes between versions are not necesarily coped with),
  --host and --build: for crosscompiling
+ --dirtcldir: specify the directory to build dirtcl in
 
 Bugs
 ----
